@@ -6,7 +6,15 @@ export async function fetchSuggestions(track, startIdx, endIdx) {
   const endPoint = track.points[endIdx]
   const gapDist = endPoint.distance - startPoint.distance
 
-  const routes = await fetchOsrmRoutes(startPoint, endPoint, track.activityType)
+  let routes
+  try {
+    routes = await fetchOsrmRoutes(startPoint, endPoint, track.activityType)
+  } catch (e) {
+    if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+      throw new Error('OSRM routing unavailable — check your connection or draw the route manually')
+    }
+    throw e
+  }
 
   return routes.map((r, i) => ({
     route: r.geometry.coordinates,

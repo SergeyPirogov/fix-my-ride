@@ -87,8 +87,8 @@ initSelection(map, {
       const chosenRoute = suggestions[0]?.route ?? null
       store.setState({ phase: 'ROUTE_CHOSEN', suggestions, chosenRoute })
     } catch (e) {
-      showToast(e.message)
-      store.setState({ phase: 'LOADED', suggestions: [], chosenRoute: null })
+      showToast(e.message, 'warning')
+      store.setState({ phase: 'ROUTE_CHOSEN', suggestions: [], chosenRoute: null })
     }
   },
   onDrawModeToggle: (entering) => {

@@ -21,6 +21,10 @@ export function initPanel({ onChoose, onDownload }) {
             <div class="panel-subtitle">Fetching routes…</div>
           </div>
         </div>
+        <div style="display:flex;align-items:center;justify-content:center;flex:1;padding:40px;flex-direction:column;gap:12px">
+          <div class="spinner"></div>
+          <div style="font-size:12px;color:var(--text-3)">Querying OSRM…</div>
+        </div>
       `
       return
     }
