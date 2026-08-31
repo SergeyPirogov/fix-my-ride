@@ -2,6 +2,7 @@
 import { store } from '../store.js'
 
 let _unsubscribe = null
+let _pointerBound = false
 
 const CHART_W = 1000 // viewBox width — scales to container via CSS
 const CHART_H = 60
@@ -40,23 +41,29 @@ function computeSpeed(points) {
   return speeds
 }
 
-function renderChart(label, unit, values, colorVar) {
+function renderChart(key, label, unit, values, colorVar) {
   const { path, min, max } = buildPath(values, CHART_W, CHART_H)
   if (!path) return ''
   return `
-    <div class="chart-row">
+    <div class="chart-row" data-chart="${key}">
       <div class="chart-row-header">
         <span class="chart-row-label">${label}</span>
-        <span class="chart-row-range">${min.toFixed(0)}–${max.toFixed(0)} ${unit}</span>
+        <span class="chart-row-range" data-role="range">${min.toFixed(0)}–${max.toFixed(0)} ${unit}</span>
       </div>
-      <svg class="chart-svg" viewBox="0 0 ${CHART_W} ${CHART_H}" preserveAspectRatio="none">
-        <path d="${path}" fill="none" stroke="${colorVar}" stroke-width="2" vector-effect="non-scaling-stroke" />
-      </svg>
+      <div class="chart-svg-wrap">
+        <svg class="chart-svg" viewBox="0 0 ${CHART_W} ${CHART_H}" preserveAspectRatio="none">
+          <path d="${path}" fill="none" stroke="${colorVar}" stroke-width="2" vector-effect="non-scaling-stroke" />
+        </svg>
+      </div>
     </div>
   `
 }
 
-export function initAnalysisPanel() {
+function fmtVal(v, unit, decimals = 0) {
+  return v == null ? '—' : `${v.toFixed(decimals)} ${unit}`
+}
+
+export function initAnalysisPanel({ onScrub, onScrubEnd } = {}) {
   const el = document.getElementById('analysis-panel')
 
   if (_unsubscribe) _unsubscribe()
@@ -79,16 +86,69 @@ export function initAnalysisPanel() {
 
     const hasHr = hr.some(v => v != null)
     const hasPower = power.some(v => v != null)
+    const totalDistKm = points[points.length - 1].distance / 1000
 
     el.innerHTML = `
+      <div class="chart-readout-bar" id="chart-readout-bar">
+        <div class="readout-item" data-role="dist"><span class="readout-label">Distance</span><span class="readout-val" id="readout-dist">0.0 km</span></div>
+        <div class="readout-item"><span class="readout-dot" style="background:#94A3B8"></span><span class="readout-label">Elevation</span><span class="readout-val" id="readout-ele">${fmtVal(ele[0], 'm')}</span></div>
+        <div class="readout-item"><span class="readout-dot" style="background:#2563EB"></span><span class="readout-label">Speed</span><span class="readout-val" id="readout-speed">${fmtVal(speed[0], 'km/h', 1)}</span></div>
+        ${hasHr ? `<div class="readout-item"><span class="readout-dot" style="background:#EF4444"></span><span class="readout-label">HR</span><span class="readout-val" id="readout-hr">${fmtVal(hr[0], 'bpm')}</span></div>` : ''}
+        ${hasPower ? `<div class="readout-item"><span class="readout-dot" style="background:#F59E0B"></span><span class="readout-label">Power</span><span class="readout-val" id="readout-power">${fmtVal(power[0], 'W')}</span></div>` : ''}
+      </div>
       <div class="chart-row-x-label">
         <span>0 km</span>
-        <span>${((points[points.length - 1].distance) / 1000).toFixed(1)} km</span>
+        <span>${totalDistKm.toFixed(1)} km</span>
       </div>
-      ${renderChart('Elevation', 'm', ele, '#94A3B8')}
-      ${renderChart('Speed', 'km/h', speed, '#2563EB')}
-      ${hasHr ? renderChart('Heart rate', 'bpm', hr, '#EF4444') : ''}
-      ${hasPower ? renderChart('Power', 'W', power, '#F59E0B') : ''}
+      <div class="chart-scrub-area" id="chart-scrub-area">
+        ${renderChart('ele', 'Elevation', 'm', ele, '#94A3B8')}
+        ${renderChart('speed', 'Speed', 'km/h', speed, '#2563EB')}
+        ${hasHr ? renderChart('hr', 'Heart rate', 'bpm', hr, '#EF4444') : ''}
+        ${hasPower ? renderChart('power', 'Power', 'W', power, '#F59E0B') : ''}
+        <div class="chart-crosshair" id="chart-crosshair"></div>
+      </div>
     `
+
+    bindScrub(el, points, { ele, speed, hr, power }, onScrub, onScrubEnd)
   })
+}
+
+function bindScrub(root, points, series, onScrub, onScrubEnd) {
+  const area = root.querySelector('#chart-scrub-area')
+  const crosshair = root.querySelector('#chart-crosshair')
+  const readoutDist = root.querySelector('#readout-dist')
+  const readoutEle = root.querySelector('#readout-ele')
+  const readoutSpeed = root.querySelector('#readout-speed')
+  const readoutHr = root.querySelector('#readout-hr')
+  const readoutPower = root.querySelector('#readout-power')
+  if (!area) return
+
+  function update(clientX) {
+    const rect = area.getBoundingClientRect()
+    let frac = (clientX - rect.left) / rect.width
+    frac = Math.max(0, Math.min(1, frac))
+    const idx = Math.round(frac * (points.length - 1))
+
+    crosshair.style.left = `${frac * 100}%`
+    crosshair.style.display = 'block'
+
+    readoutDist.textContent = `${(points[idx].distance / 1000).toFixed(2)} km`
+    readoutEle.textContent = fmtVal(series.ele[idx], 'm')
+    readoutSpeed.textContent = fmtVal(series.speed[idx], 'km/h', 1)
+    if (readoutHr) readoutHr.textContent = fmtVal(series.hr[idx], 'bpm')
+    if (readoutPower) readoutPower.textContent = fmtVal(series.power[idx], 'W')
+
+    onScrub?.({ lat: points[idx].lat, lng: points[idx].lng })
+  }
+
+  function hide() {
+    crosshair.style.display = 'none'
+    onScrubEnd?.()
+  }
+
+  area.addEventListener('mousemove', e => update(e.clientX))
+  area.addEventListener('mouseleave', hide)
+  area.addEventListener('touchstart', e => { update(e.touches[0].clientX); e.preventDefault() }, { passive: false })
+  area.addEventListener('touchmove', e => { update(e.touches[0].clientX); e.preventDefault() }, { passive: false })
+  area.addEventListener('touchend', hide)
 }

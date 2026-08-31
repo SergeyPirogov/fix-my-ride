@@ -24,7 +24,7 @@ export function renderGpxTrack(map, track) {
   map[GPX_LAYER_KEY] = L.polyline(latlngs, { color: '#EF4444', weight: 3, opacity: 0.85, dashArray: '8 6' }).addTo(map)
   // Center on the reference route itself — the broken fit track can have
   // wild GPS jumps that would zoom the view out far past the real route.
-  map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] })
+  map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40], animate: false })
 }
 
 export function clearGpxTrack(map) {
@@ -35,7 +35,7 @@ function fitBoundsToVisible(map) {
   const all = []
   if (map[FIT_LAYER_KEY]) all.push(...map[FIT_LAYER_KEY].getLatLngs())
   if (map[GPX_LAYER_KEY]) all.push(...map[GPX_LAYER_KEY].getLatLngs())
-  if (all.length > 0) map.fitBounds(L.latLngBounds(all), { padding: [40, 40] })
+  if (all.length > 0) map.fitBounds(L.latLngBounds(all), { padding: [40, 40], animate: false })
 }
 
 // Once a fix is applied, the broken fit track is replaced on the map by the
@@ -49,7 +49,7 @@ export function renderFixedTrack(map, fixedPoints) {
 
   const latlngs = fixedPoints.map(p => [p.lat, p.lng])
   map[FIX_LAYER_KEY] = [L.polyline(latlngs, { color: '#10B981', weight: 4, opacity: 0.95 }).addTo(map)]
-  map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] })
+  map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40], animate: false })
 }
 
 export function clearFixes(map) {
@@ -62,4 +62,30 @@ export function clearAll(map) {
   clearFitTrack(map)
   clearGpxTrack(map)
   clearFixes(map)
+  clearScrubMarker(map)
+}
+
+const SCRUB_MARKER_KEY = '__scrubMarker'
+
+// Shows a marker on the fixed route at the point currently scrubbed in the
+// analysis panel below the map — lets hovering a chart highlight where that
+// moment happened geographically.
+export function showScrubMarker(map, latlng) {
+  const point = [latlng.lat, latlng.lng]
+  if (!map[SCRUB_MARKER_KEY]) {
+    map[SCRUB_MARKER_KEY] = L.circleMarker(point, {
+      radius: 7,
+      color: '#fff',
+      weight: 2.5,
+      fillColor: '#0F172A',
+      fillOpacity: 1,
+      interactive: false,
+    }).addTo(map)
+  } else {
+    map[SCRUB_MARKER_KEY].setLatLng(point)
+  }
+}
+
+export function clearScrubMarker(map) {
+  if (map[SCRUB_MARKER_KEY]) { map.removeLayer(map[SCRUB_MARKER_KEY]); map[SCRUB_MARKER_KEY] = null }
 }

@@ -7,7 +7,7 @@ import { initPanel, showToast } from './ui/panel.js'
 import { parseFit } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
-import { renderFitTrack, renderGpxTrack, renderFixedTrack, clearAll } from './map/track-layer.js'
+import { renderFitTrack, renderGpxTrack, renderFixedTrack, clearAll, showScrubMarker, clearScrubMarker } from './map/track-layer.js'
 import { buildFixedTrackFromGpx, writeFit, downloadFit } from './io/fit-writer.js'
 import { initAnalysisPanel } from './ui/analysis-panel.js'
 
@@ -52,7 +52,10 @@ const map = initMap()
 
 initTopbar()
 initSidebar({ onFitFile: handleFitFile, onGpxFile: handleGpxFile, onAutoFix: doAutoFix })
-initAnalysisPanel()
+initAnalysisPanel({
+  onScrub: (latlng) => showScrubMarker(map, latlng),
+  onScrubEnd: () => clearScrubMarker(map),
+})
 initPanel({
   onDownload: () => {
     const { fitTrack, fixedPoints } = store.state
@@ -76,18 +79,22 @@ store.subscribe(state => {
   if (state.phase === 'IDLE') { clearAll(map); _lastFit = null; _lastGpx = null; _lastFixedPoints = null; return }
 
   const showsAnalysisPanel = state.phase === 'FIXED' || state.phase === 'EXPORTED'
-  if (showsAnalysisPanel !== _analysisPanelOpen) {
-    _analysisPanelOpen = showsAnalysisPanel
-    // Map's height changes when the analysis panel opens/closes below it —
-    // Leaflet needs invalidateSize() after the layout settles or tiles stay
-    // sized/positioned for the old container height.
-    setTimeout(() => map.invalidateSize(), 50)
-  }
+  const panelJustToggled = showsAnalysisPanel !== _analysisPanelOpen
+  if (panelJustToggled) _analysisPanelOpen = showsAnalysisPanel
 
   if (state.phase === 'FIXED' || state.phase === 'EXPORTED') {
     if (state.fixedPoints !== _lastFixedPoints) {
       _lastFixedPoints = state.fixedPoints
-      renderFixedTrack(map, state.fixedPoints)
+      // The analysis panel opening below the map changes its container
+      // height via a CSS transition — invalidateSize() + refit once now
+      // and once after the transition settles keeps the route centered
+      // whether or not the panel was already open.
+      const refit = () => {
+        map.invalidateSize()
+        renderFixedTrack(map, state.fixedPoints)
+      }
+      refit()
+      setTimeout(refit, 350)
     }
     return
   }
