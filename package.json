@@ -1,0 +1,25 @@
+{
+  "name": "fix-my-ride",
+  "version": "1.0.0",
+  "description": "Fix broken GPS segments in cycling/running activity files",
+  "main": "index.js",
+  "type": "module",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "Serhii Pirohov",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^8.2.2"
+  },
+  "dependencies": {
+    "fit-file-parser": "^5.0.2",
+    "leaflet": "^1.9.4"
+  }
+}
