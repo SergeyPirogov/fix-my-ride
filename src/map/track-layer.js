@@ -22,7 +22,9 @@ export function renderGpxTrack(map, track) {
   if (!track || track.points.length === 0) return
   const latlngs = track.points.map(p => [p.lat, p.lng])
   map[GPX_LAYER_KEY] = L.polyline(latlngs, { color: '#EF4444', weight: 3, opacity: 0.85, dashArray: '8 6' }).addTo(map)
-  fitBoundsToVisible(map)
+  // Center on the reference route itself — the broken fit track can have
+  // wild GPS jumps that would zoom the view out far past the real route.
+  map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] })
 }
 
 export function clearGpxTrack(map) {
