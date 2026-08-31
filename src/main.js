@@ -10,6 +10,7 @@ import { initMap } from './map/map.js'
 import { renderTrack, clearTrack, addSuggestionLayer, removeSuggestionLayer } from './map/track-layer.js'
 import { initSelection } from './map/selection.js'
 import { fetchSuggestions } from './routing/suggestions.js'
+import { buildFixedTrack, writeFit, downloadFit } from './io/fit-writer.js'
 
 async function handleFile(file) {
   const ext = file.name.split('.').pop().toLowerCase()
@@ -45,7 +46,21 @@ initPanel({
     suggestionLayer = addSuggestionLayer(map, suggestion.route)
     store.setState({ chosenRoute: suggestion.route })
   },
-  onDownload: () => {} // Task 8
+  onDownload: () => {
+    const { track, segmentStart, segmentEnd, chosenRoute } = store.state
+    if (!track || !chosenRoute) {
+      showToast('No route chosen yet')
+      return
+    }
+    try {
+      const fixedPoints = buildFixedTrack(track, segmentStart, segmentEnd, chosenRoute)
+      const fitBuffer = writeFit(fixedPoints, track.activityType)
+      downloadFit(fitBuffer, `fixed-ride-${Date.now()}.fit`)
+    } catch (e) {
+      showToast('Export failed — check browser console for details')
+      console.error(e)
+    }
+  }
 })
 
 initSelection(map, {
