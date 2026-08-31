@@ -22,7 +22,7 @@ export function initTopbar() {
           <path d="M9 4 L9 9 L13 11" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           <circle cx="9" cy="9" r="1.5" fill="var(--accent)"/>
         </svg>
-        FIX<span class="logo-dot">.</span>RIDE
+        FIX MY RIDE
       </div>
       <div class="topbar-sep"></div>
       <div class="step-indicator">

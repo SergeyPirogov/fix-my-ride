@@ -97,7 +97,11 @@ initSelection(map, {
   }
 })
 
+let _lastTrack = null
 const _unsubTrack = store.subscribe(state => {
-  if (state.phase === 'IDLE') { clearTrack(map); return }
-  if (state.track) renderTrack(map, state.track)
+  if (state.phase === 'IDLE') { clearTrack(map); _lastTrack = null; return }
+  if (state.track && state.track !== _lastTrack) {
+    _lastTrack = state.track
+    renderTrack(map, state.track)
+  }
 })

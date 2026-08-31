@@ -39,6 +39,48 @@ export function initSidebar({ onFile }) {
     const list = document.getElementById('activity-list')
     if (!list) return
     const stored = JSON.parse(sessionStorage.getItem('recentActivities') || '[]')
+
+    if (state.phase === 'LOADED' && state.track) {
+      const t = state.track
+      const totalDist = t.points[t.points.length - 1]?.distance ?? 0
+      const gapCount = t.gaps.length
+      const startPt = t.points[0]
+      const endPt = t.points[t.points.length - 1]
+      const fmt = (v) => v.toFixed(4)
+      const startTs = startPt?.timestamp ? new Date(startPt.timestamp).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : ''
+      const endTs = endPt?.timestamp ? new Date(endPt.timestamp).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : ''
+      list.innerHTML = `
+        <div class="select-prompt">
+          <div class="select-prompt-title">${gapCount > 0 ? `${gapCount} broken segment${gapCount > 1 ? 's' : ''} detected` : 'Route loaded'}</div>
+          <div class="select-prompt-dist">${(totalDist / 1000).toFixed(1)} km · ${t.activityType}</div>
+          <div class="track-endpoints">
+            <div class="track-ep"><span class="track-ep-label">Start</span><span class="track-ep-coord">${fmt(startPt.lat)}, ${fmt(startPt.lng)}</span>${startTs ? `<span class="track-ep-time">${startTs}</span>` : ''}</div>
+            <div class="track-ep-arrow">↓</div>
+            <div class="track-ep"><span class="track-ep-label">End</span><span class="track-ep-coord">${fmt(endPt.lat)}, ${fmt(endPt.lng)}</span>${endTs ? `<span class="track-ep-time">${endTs}</span>` : ''}</div>
+          </div>
+          <div class="select-prompt-steps">
+            <div class="select-step"><span class="select-step-badge">1</span>Click on the map to set the <strong>start</strong> of the broken segment</div>
+            <div class="select-step"><span class="select-step-badge">2</span>Click again to set the <strong>end</strong> of the broken segment</div>
+            <div class="select-step"><span class="select-step-badge">3</span>We'll find road-snapped routes to fix it</div>
+          </div>
+        </div>
+        ${stored.length ? `
+          <div class="sidebar-label" style="padding: 10px 16px 4px;">Recent</div>
+          ${stored.map((a, i) => `
+            <div class="activity-item ${i === 0 ? 'active' : ''}">
+              <div class="act-icon">${a.activityType === 'running' ? '🏃' : '🚴'}</div>
+              <div class="act-meta">
+                <div class="act-name">${a.name}</div>
+                <div class="act-detail">${a.date} · ${(a.distance / 1000).toFixed(1)}km</div>
+              </div>
+              <span class="badge ${a.gaps > 0 ? 'badge-broken' : 'badge-fixed'}">${a.gaps > 0 ? 'Broken' : 'Fixed'}</span>
+            </div>
+          `).join('')}
+        ` : ''}
+      `
+      return
+    }
+
     list.innerHTML = stored.length ? `
       <div class="sidebar-label" style="padding: 10px 16px 4px;">Recent</div>
       ${stored.map((a, i) => `
