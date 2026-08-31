@@ -85,7 +85,9 @@ body {
 
 #app-body { display: flex; flex: 1; overflow: hidden; }
 
-#map { flex: 1; position: relative; z-index: 0; }
+#map-column { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+#map { flex: 1; position: relative; z-index: 0; min-height: 0; }
 
 .leaflet-container { background: var(--bg-2); }
 
@@ -284,3 +286,13 @@ body {
 .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-top-color: var(--accent); } }
+/* Analysis panel (below map, Strava-style) */
+#analysis-panel { flex-shrink: 0; background: var(--surface); border-top: 1px solid var(--border); overflow-y: auto; max-height: 0; transition: max-height 0.25s ease; }
+#analysis-panel.analysis-panel-open { max-height: 220px; padding: 12px 20px 14px; }
+.chart-row-x-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-3); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; }
+.chart-row { margin-bottom: 10px; }
+.chart-row:last-child { margin-bottom: 0; }
+.chart-row-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+.chart-row-label { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+.chart-row-range { font-size: 10px; color: var(--text-3); font-family: 'JetBrains Mono', monospace; }
+.chart-svg { width: 100%; height: 44px; display: block; }

@@ -9,6 +9,7 @@ import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
 import { renderFitTrack, renderGpxTrack, renderFixedTrack, clearAll } from './map/track-layer.js'
 import { buildFixedTrackFromGpx, writeFit, downloadFit } from './io/fit-writer.js'
+import { initAnalysisPanel } from './ui/analysis-panel.js'
 
 async function handleFitFile(file) {
   if (!file.name.toLowerCase().endsWith('.fit')) {
@@ -51,6 +52,7 @@ const map = initMap()
 
 initTopbar()
 initSidebar({ onFitFile: handleFitFile, onGpxFile: handleGpxFile, onAutoFix: doAutoFix })
+initAnalysisPanel()
 initPanel({
   onDownload: () => {
     const { fitTrack, fixedPoints } = store.state
@@ -69,8 +71,18 @@ initPanel({
 let _lastFit = null
 let _lastGpx = null
 let _lastFixedPoints = null
+let _analysisPanelOpen = false
 store.subscribe(state => {
   if (state.phase === 'IDLE') { clearAll(map); _lastFit = null; _lastGpx = null; _lastFixedPoints = null; return }
+
+  const showsAnalysisPanel = state.phase === 'FIXED' || state.phase === 'EXPORTED'
+  if (showsAnalysisPanel !== _analysisPanelOpen) {
+    _analysisPanelOpen = showsAnalysisPanel
+    // Map's height changes when the analysis panel opens/closes below it —
+    // Leaflet needs invalidateSize() after the layout settles or tiles stay
+    // sized/positioned for the old container height.
+    setTimeout(() => map.invalidateSize(), 50)
+  }
 
   if (state.phase === 'FIXED' || state.phase === 'EXPORTED') {
     if (state.fixedPoints !== _lastFixedPoints) {
