@@ -92,8 +92,10 @@ export function buildFixedTrack(track, fixes) {
 
 export function writeFit(points, activityType) {
   // Minimal FIT binary writer — records only the fields we need
-  // FIT protocol: header (14 bytes) + record messages + CRC (2 bytes)
-  // We write: file_id message, session message, lap message, N record messages
+  // FIT protocol: header (14 bytes) + file_id + session + lap + N record messages + CRC (2 bytes)
+  // file_id/session/lap are required for consumers (Strava included) to trust
+  // the record timestamps — without file_id in particular, Strava reports
+  // "Time information is missing from file" even though every record has one.
 
   const buf = new ArrayBuffer(16 * 1024 * 1024) // 16MB max
   const view = new DataView(buf)
@@ -104,7 +106,53 @@ export function writeFit(points, activityType) {
   function writeU32(v) { view.setUint32(offset, v, true); offset += 4 }
   function writeI32(v) { view.setInt32(offset, v, true); offset += 4 }
 
-  // Definition message for record (mesg_num=20)
+  const FIT_EPOCH = 631065600 // seconds between Unix epoch and FIT epoch (1989-12-31)
+  const startTs = Math.round((points[0]?.timestamp ?? Date.now()) / 1000) - FIT_EPOCH
+  const endTs = Math.round((points[points.length - 1]?.timestamp ?? Date.now()) / 1000) - FIT_EPOCH
+  const totalElapsed = Math.max(0, endTs - startTs)
+  const totalDistance = points[points.length - 1]?.distance ?? 0
+  const SPORT = activityType === 'running' ? 1 : 2 // FIT sport enum: 1=running, 2=cycling
+
+  // --- file_id (mesg_num=0), local msg 1 ---
+  // Fields: type(1,enum), manufacturer(2,uint16), time_created(4,uint32)
+  writeU8(0x41); writeU8(0x00); writeU8(0x00); writeU16(0); writeU8(3)
+  writeU8(0); writeU8(1); writeU8(0)      // type: enum
+  writeU8(1); writeU8(2); writeU8(132)    // manufacturer: uint16
+  writeU8(4); writeU8(4); writeU8(134)    // time_created: uint32
+  writeU8(0x01) // data header local msg 1
+  writeU8(4)            // type: activity
+  writeU16(255)         // manufacturer: development
+  writeU32(startTs)     // time_created
+
+  // --- session (mesg_num=18), local msg 2 ---
+  // Fields: timestamp(253,4), start_time(2,4), sport(5,1), total_elapsed_time(7,4), total_distance(9,4)
+  writeU8(0x42); writeU8(0x00); writeU8(0x00); writeU16(18); writeU8(5)
+  writeU8(253); writeU8(4); writeU8(134)
+  writeU8(2); writeU8(4); writeU8(134)
+  writeU8(5); writeU8(1); writeU8(0)
+  writeU8(7); writeU8(4); writeU8(134)
+  writeU8(9); writeU8(4); writeU8(134)
+  writeU8(0x02) // data header local msg 2
+  writeU32(endTs)
+  writeU32(startTs)
+  writeU8(SPORT)
+  writeU32(Math.round(totalElapsed * 1000))
+  writeU32(Math.round(totalDistance * 100))
+
+  // --- lap (mesg_num=19), local msg 3 ---
+  // Fields: timestamp(253,4), start_time(2,4), total_elapsed_time(7,4), total_distance(9,4)
+  writeU8(0x43); writeU8(0x00); writeU8(0x00); writeU16(19); writeU8(4)
+  writeU8(253); writeU8(4); writeU8(134)
+  writeU8(2); writeU8(4); writeU8(134)
+  writeU8(7); writeU8(4); writeU8(134)
+  writeU8(9); writeU8(4); writeU8(134)
+  writeU8(0x03) // data header local msg 3
+  writeU32(endTs)
+  writeU32(startTs)
+  writeU32(Math.round(totalElapsed * 1000))
+  writeU32(Math.round(totalDistance * 100))
+
+  // --- record (mesg_num=20), local msg 0 ---
   // Fields: timestamp(4), position_lat(4), position_long(4), altitude(2), distance(4), heart_rate(1), power(2), cadence(1)
   writeU8(0x40)    // definition header (local msg 0)
   writeU8(0x00)    // reserved
@@ -124,9 +172,6 @@ export function writeFit(points, activityType) {
     [4,   1, 2],   // cadence: uint8
   ]
   fieldDefs.forEach(([num, size, type]) => { writeU8(num); writeU8(size); writeU8(type) })
-
-  const startTs = Math.round((points[0]?.timestamp ?? Date.now()) / 1000)
-  const FIT_EPOCH = 631065600 // seconds between Unix epoch and FIT epoch (1989-12-31)
 
   // Write record messages
   points.forEach(pt => {
