@@ -8,8 +8,7 @@ import { parseFit } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
 import { renderFitTrack, renderGpxTrack, renderFixedTrack, clearAll } from './map/track-layer.js'
-import { matchAllGaps } from './routing/gpx-match.js'
-import { buildFixedTrack, writeFit, downloadFit } from './io/fit-writer.js'
+import { buildFixedTrackFromGpx, writeFit, downloadFit } from './io/fit-writer.js'
 
 async function handleFitFile(file) {
   if (!file.name.toLowerCase().endsWith('.fit')) {
@@ -44,19 +43,8 @@ async function doAutoFix() {
   if (!fitTrack || !gpxTrack) return
   store.setState({ phase: 'FIXING' })
 
-  if (fitTrack.gaps.length === 0) {
-    store.setState({ phase: 'FIXED', fixes: [], fixedPoints: fitTrack.points })
-    return
-  }
-
-  const fixes = matchAllGaps(fitTrack, gpxTrack)
-  const fixedPoints = buildFixedTrack(fitTrack, fixes)
-  store.setState({ phase: 'FIXED', fixes, fixedPoints })
-
-  const failCount = fixes.filter(f => f.status === 'failed').length
-  if (failCount > 0) {
-    showToast(`${failCount} gap${failCount > 1 ? 's' : ''} had no nearby GPX match`, 'warning')
-  }
+  const fixedPoints = buildFixedTrackFromGpx(fitTrack, gpxTrack)
+  store.setState({ phase: 'FIXED', fixedPoints })
 }
 
 const map = initMap()
@@ -87,7 +75,7 @@ store.subscribe(state => {
   if (state.phase === 'FIXED' || state.phase === 'EXPORTED') {
     if (state.fixedPoints !== _lastFixedPoints) {
       _lastFixedPoints = state.fixedPoints
-      renderFixedTrack(map, state.fixedPoints, state.fitTrack, state.fixes)
+      renderFixedTrack(map, state.fixedPoints)
     }
     return
   }

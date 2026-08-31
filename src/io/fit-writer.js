@@ -9,84 +9,72 @@ function haversineDistance(p1, p2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function sampleRouteAt10m(routeCoords) {
-  // routeCoords: [lng, lat][] from OSRM
+function sampleGpxAt10m(gpxPoints) {
   const TARGET = 10 // metres
   const result = []
-  for (let i = 0; i < routeCoords.length - 1; i++) {
-    const [lng1, lat1] = routeCoords[i]
-    const [lng2, lat2] = routeCoords[i + 1]
-    const segDist = haversineDistance({ lat: lat1, lng: lng1 }, { lat: lat2, lng: lng2 })
+  for (let i = 0; i < gpxPoints.length - 1; i++) {
+    const p1 = gpxPoints[i]
+    const p2 = gpxPoints[i + 1]
+    const segDist = haversineDistance(p1, p2)
     const steps = Math.max(1, Math.round(segDist / TARGET))
     for (let s = 0; s < steps; s++) {
       const t = s / steps
-      result.push({ lat: lat1 + (lat2 - lat1) * t, lng: lng1 + (lng2 - lng1) * t })
+      result.push({
+        lat: p1.lat + (p2.lat - p1.lat) * t,
+        lng: p1.lng + (p2.lng - p1.lng) * t,
+        ele: p1.ele + (p2.ele - p1.ele) * t,
+      })
     }
   }
-  const last = routeCoords[routeCoords.length - 1]
-  result.push({ lat: last[1], lng: last[0] })
+  const last = gpxPoints[gpxPoints.length - 1]
+  result.push({ lat: last.lat, lng: last.lng, ele: last.ele })
   return result
 }
 
-function buildSegmentInsert(points, startIdx, endIdx, routeCoords) {
-  const preGap = points.slice(Math.max(0, startIdx - 4), startIdx + 1)
-  const avgHr = preGap.some(p => p.hr != null)
-    ? Math.round(preGap.filter(p => p.hr != null).reduce((s, p) => s + p.hr, 0) / preGap.filter(p => p.hr != null).length)
-    : null
-  const avgPower = preGap.some(p => p.power != null)
-    ? Math.round(preGap.filter(p => p.power != null).reduce((s, p) => s + p.power, 0) / preGap.filter(p => p.power != null).length)
-    : null
-  const avgCadence = preGap.some(p => p.cadence != null)
-    ? Math.round(preGap.filter(p => p.cadence != null).reduce((s, p) => s + p.cadence, 0) / preGap.filter(p => p.cadence != null).length)
-    : null
+// Interpolates hr/power/cadence from the fit track's own samples at a given
+// fraction of elapsed time — preserves the recorded performance data while
+// the geographic path is replaced by the gpx route.
+function sampleFitMetricAt(fitPoints, frac, key) {
+  const withValue = fitPoints.filter(p => p[key] != null)
+  if (withValue.length === 0) return null
+  const targetTs = fitPoints[0].timestamp + frac * (fitPoints[fitPoints.length - 1].timestamp - fitPoints[0].timestamp)
+  let lo = withValue[0]
+  for (const p of withValue) {
+    if (p.timestamp > targetTs) break
+    lo = p
+  }
+  return lo[key]
+}
 
-  const startPt = points[startIdx]
-  const endPt = points[endIdx]
-  const gapDuration = endPt.timestamp - startPt.timestamp
-  const gapStartDist = startPt.distance
+// Replaces the entire route's geography with the gpx reference path, while
+// keeping the fit track's recorded timing/HR/power/cadence by remapping
+// them proportionally: gpx distance-fraction -> fit time-fraction.
+export function buildFixedTrackFromGpx(fitTrack, gpxTrack) {
+  const fitPoints = fitTrack.points
+  const startPt = fitPoints[0]
+  const endPt = fitPoints[fitPoints.length - 1]
+  const duration = endPt.timestamp - startPt.timestamp
 
-  const sampled = sampleRouteAt10m(routeCoords)
+  const sampled = sampleGpxAt10m(gpxTrack.points)
   let cumulDist = 0
   const sampledWithDist = sampled.map((pt, i) => {
     if (i > 0) cumulDist += haversineDistance(sampled[i - 1], pt)
     return { ...pt, localDist: cumulDist }
   })
-  const totalRouteDist = cumulDist || 1
+  const totalDist = cumulDist || 1
 
   return sampledWithDist.map(pt => {
-    const frac = pt.localDist / totalRouteDist
+    const frac = pt.localDist / totalDist
     return {
-      lat: pt.lat, lng: pt.lng,
-      ele: startPt.ele + (endPt.ele - startPt.ele) * frac,
-      timestamp: startPt.timestamp + gapDuration * frac,
-      hr: avgHr, power: avgPower, cadence: avgCadence,
-      distance: gapStartDist + pt.localDist,
+      lat: pt.lat,
+      lng: pt.lng,
+      ele: pt.ele,
+      timestamp: startPt.timestamp + duration * frac,
+      hr: sampleFitMetricAt(fitPoints, frac, 'hr'),
+      power: sampleFitMetricAt(fitPoints, frac, 'power'),
+      cadence: sampleFitMetricAt(fitPoints, frac, 'cadence'),
+      distance: Math.round(pt.localDist),
     }
-  })
-}
-
-// fixes: [{ startIdx, endIdx, route }] sorted by startIdx ascending
-export function buildFixedTrack(track, fixes) {
-  const { points } = track
-  // Sort fixes by startIdx so we process in order
-  const sorted = [...fixes].filter(f => f.route).sort((a, b) => a.startIdx - b.startIdx)
-
-  if (sorted.length === 0) return [...points]
-
-  const parts = []
-  let cursor = 0
-
-  for (const fix of sorted) {
-    parts.push(...points.slice(cursor, fix.startIdx))
-    parts.push(...buildSegmentInsert(points, fix.startIdx, fix.endIdx, fix.route))
-    cursor = fix.endIdx + 1
-  }
-  parts.push(...points.slice(cursor))
-
-  let runDist = 0
-  return parts.map((pt, i) => {
-    if (i > 0) runDist += haversineDistance(parts[i - 1], pt)
-    return { ...pt, distance: Math.round(runDist) }
   })
 }
 

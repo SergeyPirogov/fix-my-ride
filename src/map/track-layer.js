@@ -41,32 +41,15 @@ function fitBoundsToVisible(map) {
 // Once a fix is applied, the broken fit track is replaced on the map by the
 // actual corrected route (the same points that get written to the .fit file)
 // so what's visible matches what downloads — solid green, drawn over the
-// hidden blue original. Gaps with no gpx match stay visible as orange
-// dashed straight lines so the user can see what's still broken.
-export function renderFixedTrack(map, fixedPoints, fitTrack, fixes) {
+// hidden blue original.
+export function renderFixedTrack(map, fixedPoints) {
   clearFixes(map)
   clearFitTrack(map)
-  const layers = []
+  if (!fixedPoints || fixedPoints.length === 0) return
 
-  if (fixedPoints && fixedPoints.length > 0) {
-    const latlngs = fixedPoints.map(p => [p.lat, p.lng])
-    layers.push(L.polyline(latlngs, { color: '#10B981', weight: 4, opacity: 0.95 }).addTo(map))
-  }
-
-  fixes.forEach(fix => {
-    if (fix.status !== 'ok') {
-      const s = fitTrack.points[fix.startIdx]
-      const e = fitTrack.points[fix.endIdx]
-      layers.push(L.polyline([[s.lat, s.lng], [e.lat, e.lng]], {
-        color: '#F59E0B', weight: 3, opacity: 0.8, dashArray: '4 4',
-      }).addTo(map))
-    }
-  })
-
-  map[FIX_LAYER_KEY] = layers
-  if (fixedPoints && fixedPoints.length > 0) {
-    map.fitBounds(L.latLngBounds(fixedPoints.map(p => [p.lat, p.lng])), { padding: [40, 40] })
-  }
+  const latlngs = fixedPoints.map(p => [p.lat, p.lng])
+  map[FIX_LAYER_KEY] = [L.polyline(latlngs, { color: '#10B981', weight: 4, opacity: 0.95 }).addTo(map)]
+  map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] })
 }
 
 export function clearFixes(map) {

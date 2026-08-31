@@ -79,10 +79,10 @@ function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
       <div class="sidebar-section border-b">${trackSummary(state.fitTrack, 'FIT (broken)', 'label-blue')}</div>
       <div class="sidebar-section border-b">${trackSummary(state.gpxTrack, 'GPX (reference)', 'label-red')}</div>
       <div class="sidebar-section">
-        <div class="sidebar-label">Gaps Detected</div>
+        <div class="sidebar-label">Fix Route</div>
         <div class="gap-hint">
-          <span class="gap-hint-icon">⚠</span>
-          ${state.fitTrack.gaps.length} gap${state.fitTrack.gaps.length !== 1 ? 's' : ''} in the fit file
+          <span class="gap-hint-icon">ℹ</span>
+          Replaces the whole path with the GPX route, keeping your recorded time/HR/power/cadence
         </div>
         <button class="btn btn-primary" id="btn-auto-fix" style="width:100%;margin-top:12px">Fix using GPX →</button>
       </div>
@@ -94,10 +94,10 @@ function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
   if (state.phase === 'FIXING') {
     el.innerHTML = `
       <div class="sidebar-section">
-        <div class="sidebar-label">Matching Gaps</div>
+        <div class="sidebar-label">Rebuilding Route</div>
         <div style="display:flex;align-items:center;gap:10px;padding:16px 0">
           <div class="spinner"></div>
-          <div style="font-size:12px;color:var(--text-3)">Finding matching GPX segments…</div>
+          <div style="font-size:12px;color:var(--text-3)">Mapping your ride onto the GPX path…</div>
         </div>
       </div>
     `
@@ -105,15 +105,14 @@ function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
   }
 
   if ((state.phase === 'FIXED' || state.phase === 'EXPORTED') && state.fitTrack) {
-    const okCount = state.fixes.filter(f => f.status === 'ok').length
-    const failCount = state.fixes.filter(f => f.status === 'failed').length
+    const fixedDist = state.fixedPoints?.[state.fixedPoints.length - 1]?.distance ?? 0
     el.innerHTML = `
       <div class="sidebar-section border-b">${trackSummary(state.fitTrack, 'FIT (broken)', 'label-blue')}</div>
       <div class="sidebar-section border-b">${trackSummary(state.gpxTrack, 'GPX (reference)', 'label-red')}</div>
       <div class="sidebar-section">
         <div class="sidebar-label">Fix Result</div>
-        <div class="track-meta-row"><span class="track-meta-key">Matched</span><span class="track-meta-val val-ok">${okCount}</span></div>
-        ${failCount > 0 ? `<div class="track-meta-row"><span class="track-meta-key">Unmatched</span><span class="track-meta-val val-broken">${failCount}</span></div>` : ''}
+        <div class="track-meta-row"><span class="track-meta-key">Fixed points</span><span class="track-meta-val val-ok">${state.fixedPoints?.length ?? 0}</span></div>
+        <div class="track-meta-row"><span class="track-meta-key">Distance</span><span class="track-meta-val">${(fixedDist / 1000).toFixed(1)} km</span></div>
         <button class="btn btn-ghost" id="btn-reselect" style="margin-top:10px;width:100%">← Start over</button>
       </div>
     `

@@ -33,9 +33,9 @@ describe('store', () => {
   })
 
   it('reset returns to IDLE', () => {
-    store.setState({ phase: 'FIXED', fixes: [{ gapIdx: 0 }] })
+    store.setState({ phase: 'FIXED', fixedPoints: [{ lat: 1, lng: 1 }] })
     store.reset()
     expect(store.state.phase).toBe('IDLE')
-    expect(store.state.fixes).toEqual([])
+    expect(store.state.fixedPoints).toBeNull()
   })
 })
