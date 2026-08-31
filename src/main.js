@@ -6,6 +6,8 @@ import { initSidebar, recordRecentActivity } from './ui/sidebar.js'
 import { initPanel, showToast } from './ui/panel.js'
 import { parseFit } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
+import { initMap } from './map/map.js'
+import { renderTrack, clearTrack } from './map/track-layer.js'
 
 async function handleFile(file) {
   const ext = file.name.split('.').pop().toLowerCase()
@@ -29,6 +31,13 @@ async function handleFile(file) {
   }
 }
 
+const map = initMap()
+
 initTopbar()
 initSidebar({ onFile: handleFile })
 initPanel({ onChoose: () => {}, onDownload: () => {} })
+
+store.subscribe(state => {
+  if (state.phase === 'IDLE') { clearTrack(map); return }
+  if (state.track) renderTrack(map, state.track)
+})
