@@ -3,80 +3,58 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-export function initPanel({ onChoose, onDrawMode, onDownload }) {
+export function initPanel({ onDownload }) {
   const el = document.getElementById('right-panel')
   el.className = 'right-panel'
 
   if (_unsubscribe) _unsubscribe()
   _unsubscribe = store.subscribe(state => {
-    if (state.phase === 'IDLE' || state.phase === 'LOADED' || state.phase === 'SELECTING') {
+    if (state.phase !== 'FIXED' && state.phase !== 'EXPORTED') {
       el.innerHTML = ''
       return
     }
-    if (state.phase === 'FIXING') {
-      el.innerHTML = `
-        <div class="panel-header">
-          <div class="panel-title">Finding Routes</div>
-          <div class="panel-subtitle">Querying OSRM…</div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px">
-          <div class="spinner"></div>
-          <div style="font-size:12px;color:var(--text-3)">Finding road-snapped routes</div>
-        </div>
-      `
-      return
-    }
-    if (state.phase === 'FIXED' || state.phase === 'EXPORTED') {
-      const gapDist = (state.track.points[state.segmentEnd]?.distance ?? 0) - (state.track.points[state.segmentStart]?.distance ?? 0)
-      const tStart = state.track.points[state.segmentStart]?.timestamp ?? 0
-      const tEnd = state.track.points[state.segmentEnd]?.timestamp ?? 0
-      const gapMin = Math.round((tEnd - tStart) / 60000)
 
-      el.innerHTML = `
-        <div class="panel-header">
-          <div>
-            <div class="panel-title">Route Options</div>
-            <div class="panel-subtitle">${state.suggestions.length} routes · gap ${(gapDist / 1000).toFixed(1)} km</div>
-          </div>
+    const okCount = state.fixes.filter(f => f.status === 'ok').length
+    const failCount = state.fixes.filter(f => f.status === 'failed').length
+
+    el.innerHTML = `
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Fix Result</div>
+          <div class="panel-subtitle">${okCount} matched${failCount > 0 ? ` · ${failCount} unmatched` : ''}</div>
         </div>
-        <div class="segment-info">
-          <div class="seg-stat"><div class="seg-stat-label">Gap Distance</div><div class="seg-stat-val bad">${(gapDist / 1000).toFixed(1)} km</div></div>
-          <div class="seg-stat"><div class="seg-stat-label">Duration</div><div class="seg-stat-val bad">~${gapMin} min</div></div>
-          <div class="seg-stat"><div class="seg-stat-label">Surface</div><div class="seg-stat-val">Road</div></div>
-          <div class="seg-stat"><div class="seg-stat-label">Type</div><div class="seg-stat-val">${state.track.activityType}</div></div>
+      </div>
+      ${failCount > 0 ? `
+        <div style="padding:12px 16px;background:var(--warning-subtle);border-bottom:1px solid var(--warning-border);font-size:12px;color:var(--warning-text)">
+          ${failCount} gap${failCount > 1 ? 's' : ''} had no matching GPX segment nearby — shown as an orange dashed line on the map.
         </div>
-        <div class="suggestions-list">
-          ${state.suggestions.map((s, i) => `
-            <div class="suggestion-card ${state.chosenRoute === s.route ? 'selected' : ''}" data-idx="${i}">
-              <div class="suggestion-body">
-                <div class="suggestion-name">
-                  ${s.label}
-                  ${i === 0 ? '<span class="suggestion-tag tag-recommended">Best</span>' : ''}
-                </div>
-                <div class="suggestion-stats">
-                  <div class="sug-stat"><div class="sug-stat-label">Distance</div><div class="sug-stat-val">${(s.distance / 1000).toFixed(2)} km</div></div>
-                  <div class="sug-stat"><div class="sug-stat-label">Match</div><div class="sug-stat-val" style="color:${s.matchScore > 0.85 ? 'var(--success)' : 'var(--warning)'}">${Math.round(s.matchScore * 100)}%</div></div>
-                </div>
+      ` : ''}
+      <div class="fix-list">
+        ${state.fixes.map((fix, i) => {
+          const s = state.fitTrack.points[fix.startIdx]
+          const e = state.fitTrack.points[fix.endIdx]
+          const gapDist = ((e.distance - s.distance) / 1000).toFixed(2)
+          return `
+            <div class="fix-item">
+              <div class="fix-item-header">
+                <span class="fix-item-label">Gap ${i + 1}</span>
+                <span class="badge ${fix.status === 'ok' ? 'badge-fixed' : 'badge-broken'}">${fix.status === 'ok' ? 'Matched' : 'Unmatched'}</span>
               </div>
+              <div class="fix-item-dist">${gapDist} km</div>
             </div>
-          `).join('')}
-          <div class="suggestion-card" id="manual-draw-card">
-            <div class="suggestion-body">
-              <div class="suggestion-name">Draw Manually <span class="suggestion-tag tag-manual">Custom</span></div>
-              <div style="font-size:12px;color:var(--text-2);margin-top:4px">Click waypoints on the map to build your own route.</div>
-            </div>
-          </div>
-        </div>
-        <div class="panel-actions">
-          <button class="btn btn-success" id="btn-download" ${!state.chosenRoute ? 'disabled' : ''} style="${!state.chosenRoute ? 'opacity:0.5' : ''}">Download .fit</button>
-        </div>
-      `
-      el.querySelectorAll('.suggestion-card[data-idx]').forEach(card => {
-        card.addEventListener('click', () => onChoose(state.suggestions[parseInt(card.dataset.idx)]))
-      })
-      document.getElementById('manual-draw-card')?.addEventListener('click', () => onDrawMode())
-      document.getElementById('btn-download')?.addEventListener('click', () => onDownload())
-    }
+          `
+        }).join('')}
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center">
+        <div style="font-size:32px">${failCount === 0 ? '✓' : '⚠'}</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-1)">${failCount === 0 ? 'Track ready' : 'Review unmatched gaps'}</div>
+        <div style="font-size:12px;color:var(--text-3)">Green = matched from GPX · Orange dashed = unmatched</div>
+      </div>
+      <div class="panel-actions">
+        <button class="btn btn-success" id="btn-download">Download .fit</button>
+      </div>
+    `
+    document.getElementById('btn-download')?.addEventListener('click', () => onDownload())
   })
 }
 

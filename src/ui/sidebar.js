@@ -3,175 +3,130 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-export function initSidebar({ onFile, onFindRoute, onUndo }) {
+export function initSidebar({ onFitFile, onGpxFile, onAutoFix }) {
   const el = document.getElementById('sidebar')
   el.className = 'sidebar'
 
-  // Initial render
-  renderSidebar(el, onFile, onFindRoute, onUndo, store.state)
+  renderSidebar(el, onFitFile, onGpxFile, onAutoFix, store.state)
 
   if (_unsubscribe) _unsubscribe()
   _unsubscribe = store.subscribe(state => {
-    renderSidebar(el, onFile, onFindRoute, onUndo, state)
+    renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state)
   })
 }
 
-function renderSidebar(el, onFile, onFindRoute, onUndo, state) {
-  if (state.phase === 'IDLE') {
+function trackSummary(track, label, colorClass) {
+  const totalDist = track.points[track.points.length - 1]?.distance ?? 0
+  return `
+    <div class="track-summary">
+      <div class="track-summary-label ${colorClass}">${label}</div>
+      <div class="track-meta">
+        <div class="track-meta-row"><span class="track-meta-key">Distance</span><span class="track-meta-val">${(totalDist / 1000).toFixed(1)} km</span></div>
+        <div class="track-meta-row"><span class="track-meta-key">Points</span><span class="track-meta-val">${track.points.length}</span></div>
+      </div>
+    </div>
+  `
+}
+
+function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
+  if (state.phase === 'IDLE' || state.phase === 'FIT_LOADED') {
+    const fit = state.fitTrack
     el.innerHTML = `
       <div class="upload-page">
-        <div class="upload-page-title">Fix broken GPS segments</div>
-        <div class="upload-page-sub">Upload your .fit or .gpx activity file to get started</div>
-        <div class="upload-zone upload-zone-large" id="upload-zone">
-          <div class="upload-icon-large">📂</div>
-          <div class="upload-cta">Drop file here or <span class="upload-link">browse</span></div>
-          <div class="upload-formats">.fit · .gpx · max 50 MB</div>
-          <input type="file" id="file-input" accept=".fit,.gpx" style="display:none" />
+        <div class="upload-page-title">Fix broken GPS with a reference route</div>
+        <div class="upload-page-sub">Upload your broken activity, then a reference route to fix it against</div>
+
+        <div class="dual-upload-step ${fit ? 'step-complete' : 'step-active'}">
+          <div class="dual-upload-num">${fit ? '✓' : '1'}</div>
+          <div class="dual-upload-body">
+            <div class="dual-upload-title">Broken .fit file</div>
+            ${fit ? `
+              <div class="dual-upload-done">${fit.points.length} points · ${(((fit.points[fit.points.length-1]?.distance ?? 0))/1000).toFixed(1)} km</div>
+            ` : `
+              <div class="upload-zone" id="upload-zone-fit">
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">Drop <strong>.fit</strong> here or click to browse</div>
+                <input type="file" id="file-input-fit" accept=".fit" style="display:none" />
+              </div>
+            `}
+          </div>
+        </div>
+
+        <div class="dual-upload-step ${!fit ? 'step-disabled' : 'step-active'}">
+          <div class="dual-upload-num">2</div>
+          <div class="dual-upload-body">
+            <div class="dual-upload-title">Reference .gpx route</div>
+            ${fit ? `
+              <div class="upload-zone" id="upload-zone-gpx">
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">Drop <strong>.gpx</strong> here or click to browse</div>
+                <input type="file" id="file-input-gpx" accept=".gpx" style="display:none" />
+              </div>
+            ` : `
+              <div class="upload-hint-disabled">Upload the broken .fit file first</div>
+            `}
+          </div>
         </div>
       </div>
     `
-    _bindUpload(el, onFile)
+    _bindZone(el, 'upload-zone-fit', 'file-input-fit', onFitFile)
+    _bindZone(el, 'upload-zone-gpx', 'file-input-gpx', onGpxFile)
     return
   }
 
-  if ((state.phase === 'LOADED' || state.phase === 'SELECTING') && state.track) {
-    const t = state.track
-    const totalDist = t.points[t.points.length - 1]?.distance ?? 0
-    const startPt = t.points[0]
-    const endPt = t.points[t.points.length - 1]
-    const fmt = v => v.toFixed(4)
-    const startTs = startPt?.timestamp ? new Date(startPt.timestamp).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : ''
-    const endTs = endPt?.timestamp ? new Date(endPt.timestamp).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : ''
-
+  if (state.phase === 'BOTH_LOADED' && state.fitTrack && state.gpxTrack) {
     el.innerHTML = `
-      <div class="sidebar-section border-b">
-        <div class="sidebar-label">Activity</div>
-        <div class="track-meta">
-          <div class="track-meta-row"><span class="track-meta-key">Distance</span><span class="track-meta-val">${(totalDist / 1000).toFixed(1)} km</span></div>
-          <div class="track-meta-row"><span class="track-meta-key">Type</span><span class="track-meta-val">${t.activityType}</span></div>
-          <div class="track-meta-row"><span class="track-meta-key">Points</span><span class="track-meta-val">${t.points.length}</span></div>
-          <div class="track-meta-row"><span class="track-meta-key">Gaps</span><span class="track-meta-val ${t.gaps.length > 0 ? 'val-broken' : 'val-ok'}">${t.gaps.length}</span></div>
-        </div>
-        <div class="track-endpoints">
-          <div class="track-ep"><span class="track-ep-label">Start</span><span class="track-ep-coord">${fmt(startPt.lat)}, ${fmt(startPt.lng)}</span>${startTs ? `<span class="track-ep-time">${startTs}</span>` : ''}</div>
-          <div class="track-ep-arrow">↓</div>
-          <div class="track-ep"><span class="track-ep-label">End</span><span class="track-ep-coord">${fmt(endPt.lat)}, ${fmt(endPt.lng)}</span>${endTs ? `<span class="track-ep-time">${endTs}</span>` : ''}</div>
-        </div>
-      </div>
+      <div class="sidebar-section border-b">${trackSummary(state.fitTrack, 'FIT (broken)', 'label-blue')}</div>
+      <div class="sidebar-section border-b">${trackSummary(state.gpxTrack, 'GPX (reference)', 'label-red')}</div>
       <div class="sidebar-section">
-        <div class="sidebar-label">Broken Segment</div>
-        ${t.gaps.length > 0 ? `
-          <div class="gap-hint" style="margin-bottom:12px">
-            <span class="gap-hint-icon">⚠</span>
-            ${t.gaps.length} gap${t.gaps.length > 1 ? 's' : ''} detected — red dashed on map
-          </div>
-        ` : ''}
-        <div class="coord-field">
-          <label class="coord-label">Start point</label>
-          <input class="coord-input" id="coord-start" type="text" placeholder="48.2100, 16.3700" value="${state.segmentStartPt ? `${fmt(state.segmentStartPt.lat)}, ${fmt(state.segmentStartPt.lng)}` : ''}" />
-          <div class="coord-hint" id="coord-start-hint">${state.segmentStart !== null ? `Nearest track point: ${state.segmentStart}` : 'Or click on map'}</div>
+        <div class="sidebar-label">Gaps Detected</div>
+        <div class="gap-hint">
+          <span class="gap-hint-icon">⚠</span>
+          ${state.fitTrack.gaps.length} gap${state.fitTrack.gaps.length !== 1 ? 's' : ''} in the fit file
         </div>
-        <div class="coord-field">
-          <label class="coord-label">End point</label>
-          <input class="coord-input" id="coord-end" type="text" placeholder="48.2200, 16.3850" value="${state.segmentEndPt ? `${fmt(state.segmentEndPt.lat)}, ${fmt(state.segmentEndPt.lng)}` : ''}" />
-          <div class="coord-hint" id="coord-end-hint">${state.segmentEnd !== null ? `Nearest track point: ${state.segmentEnd}` : 'Or click on map'}</div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-ghost" id="btn-undo-click" ${!state.segmentStartPt ? 'disabled' : ''}>↺ Undo</button>
-          <button class="btn btn-primary" id="btn-find-route" style="flex:1" ${!state.segmentStartPt || !state.segmentEndPt ? 'disabled' : ''}>Find Route →</button>
-        </div>
-        ${t.gaps.length === 0 ? '<div class="no-gaps-msg" style="margin-top:8px">No gaps detected — track looks clean</div>' : ''}
+        <button class="btn btn-primary" id="btn-auto-fix" style="width:100%;margin-top:12px">Fix using GPX →</button>
       </div>
     `
-
-    // Wire coord inputs — exact typed lat/lng is used as-is (no snapping);
-    // the nearest track point is only found to know where to splice the fix.
-    function parseCoord(str) {
-      const m = str.match(/(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/)
-      if (!m) return null
-      return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) }
-    }
-    function nearestIdx(lat, lng) {
-      let minD = Infinity, minI = 0
-      t.points.forEach((p, i) => {
-        const d = Math.hypot(p.lat - lat, p.lng - lng)
-        if (d < minD) { minD = d; minI = i }
-      })
-      return minI
-    }
-    function updateBtn() {
-      const btn = el.querySelector('#btn-find-route')
-      if (btn) btn.disabled = store.state.segmentStartPt === null || store.state.segmentEndPt === null
-    }
-
-    el.querySelector('#coord-start')?.addEventListener('input', e => {
-      const c = parseCoord(e.target.value)
-      if (!c) { el.querySelector('#coord-start-hint').textContent = 'Invalid — use: lat, lng'; store.setState({ segmentStartPt: null }); updateBtn(); return }
-      const idx = nearestIdx(c.lat, c.lng)
-      el.querySelector('#coord-start-hint').textContent = `Nearest track point: ${idx}`
-      store.setState({ segmentStart: idx, segmentStartPt: c })
-      updateBtn()
-    })
-    el.querySelector('#coord-end')?.addEventListener('input', e => {
-      const c = parseCoord(e.target.value)
-      if (!c) { el.querySelector('#coord-end-hint').textContent = 'Invalid — use: lat, lng'; store.setState({ segmentEndPt: null }); updateBtn(); return }
-      const idx = nearestIdx(c.lat, c.lng)
-      el.querySelector('#coord-end-hint').textContent = `Nearest track point: ${idx}`
-      store.setState({ segmentEnd: idx, segmentEndPt: c })
-      updateBtn()
-    })
-    el.querySelector('#btn-find-route')?.addEventListener('click', () => {
-      const { segmentStart, segmentEnd, segmentStartPt, segmentEndPt } = store.state
-      if (segmentStartPt && segmentEndPt) {
-        onFindRoute(segmentStart, segmentEnd, segmentStartPt, segmentEndPt)
-      }
-    })
-    el.querySelector('#btn-undo-click')?.addEventListener('click', () => onUndo?.())
+    el.querySelector('#btn-auto-fix')?.addEventListener('click', () => onAutoFix())
     return
   }
 
   if (state.phase === 'FIXING') {
     el.innerHTML = `
       <div class="sidebar-section">
-        <div class="sidebar-label">Finding Routes</div>
+        <div class="sidebar-label">Matching Gaps</div>
         <div style="display:flex;align-items:center;gap:10px;padding:16px 0">
           <div class="spinner"></div>
-          <div style="font-size:12px;color:var(--text-3)">Querying OSRM…</div>
+          <div style="font-size:12px;color:var(--text-3)">Finding matching GPX segments…</div>
         </div>
       </div>
     `
     return
   }
 
-  if (state.phase === 'FIXED' || state.phase === 'EXPORTED') {
-    const t = state.track
-    const totalDist = t.points[t.points.length - 1]?.distance ?? 0
+  if ((state.phase === 'FIXED' || state.phase === 'EXPORTED') && state.fitTrack) {
+    const okCount = state.fixes.filter(f => f.status === 'ok').length
+    const failCount = state.fixes.filter(f => f.status === 'failed').length
     el.innerHTML = `
-      <div class="sidebar-section border-b">
-        <div class="sidebar-label">Activity</div>
-        <div class="track-meta">
-          <div class="track-meta-row"><span class="track-meta-key">Distance</span><span class="track-meta-val">${(totalDist / 1000).toFixed(1)} km</span></div>
-          <div class="track-meta-row"><span class="track-meta-key">Type</span><span class="track-meta-val">${t.activityType}</span></div>
-        </div>
-      </div>
+      <div class="sidebar-section border-b">${trackSummary(state.fitTrack, 'FIT (broken)', 'label-blue')}</div>
+      <div class="sidebar-section border-b">${trackSummary(state.gpxTrack, 'GPX (reference)', 'label-red')}</div>
       <div class="sidebar-section">
-        <div class="sidebar-label">Route Options</div>
-        <div style="font-size:12px;color:var(--text-3);padding:8px 0">Choose a route in the panel → apply fix → download.</div>
-        <button class="btn btn-ghost" id="btn-reselect" style="margin-top:8px;width:100%">← Reselect segment</button>
+        <div class="sidebar-label">Fix Result</div>
+        <div class="track-meta-row"><span class="track-meta-key">Matched</span><span class="track-meta-val val-ok">${okCount}</span></div>
+        ${failCount > 0 ? `<div class="track-meta-row"><span class="track-meta-key">Unmatched</span><span class="track-meta-val val-broken">${failCount}</span></div>` : ''}
+        <button class="btn btn-ghost" id="btn-reselect" style="margin-top:10px;width:100%">← Start over</button>
       </div>
     `
-    document.getElementById('btn-reselect')?.addEventListener('click', () => {
-      store.setState({ phase: 'LOADED', segmentStart: null, segmentEnd: null, segmentStartPt: null, segmentEndPt: null, suggestions: [], chosenRoute: null })
-    })
+    el.querySelector('#btn-reselect')?.addEventListener('click', () => store.reset())
     return
   }
 
   el.innerHTML = ''
 }
 
-function _bindUpload(el, onFile) {
-  const zone = el.querySelector('#upload-zone')
-  const input = el.querySelector('#file-input')
+function _bindZone(el, zoneId, inputId, onFile) {
+  const zone = el.querySelector(`#${zoneId}`)
+  const input = el.querySelector(`#${inputId}`)
   if (!zone || !input) return
 
   zone.addEventListener('click', () => input.click())
@@ -184,14 +139,4 @@ function _bindUpload(el, onFile) {
     const f = e.dataTransfer.files[0]
     if (f) onFile(f)
   })
-}
-
-export function recordRecentActivity(track, filename) {
-  const stored = JSON.parse(sessionStorage.getItem('recentActivities') || '[]')
-  const totalDist = track.points[track.points.length - 1]?.distance ?? 0
-  const ts = track.points[0]?.timestamp
-  const date = ts ? new Date(ts).toLocaleDateString('en', { month: 'short', day: 'numeric' }) : ''
-  const name = filename.replace(/\.(fit|gpx)$/i, '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c]))
-  stored.unshift({ name, activityType: track.activityType, date, distance: totalDist, gaps: track.gaps.length })
-  sessionStorage.setItem('recentActivities', JSON.stringify(stored.slice(0, 10)))
 }

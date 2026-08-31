@@ -90,11 +90,6 @@ export function buildFixedTrack(track, fixes) {
   })
 }
 
-// Legacy single-segment helper kept for draw-mode compatibility
-export function buildFixedTrackSingle(track, startIdx, endIdx, routeCoords) {
-  return buildFixedTrack(track, [{ startIdx, endIdx, route: routeCoords }])
-}
-
 export function writeFit(points, activityType) {
   // Minimal FIT binary writer — records only the fields we need
   // FIT protocol: header (14 bytes) + record messages + CRC (2 bytes)

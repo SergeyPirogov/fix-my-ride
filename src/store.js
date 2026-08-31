@@ -1,13 +1,9 @@
 // src/store.js
 const INITIAL_STATE = {
-  phase: 'IDLE',        // IDLE | LOADED | SELECTING | FIXING | FIXED | EXPORTED
-  track: null,
-  segmentStart: null,   // point index (splice position — nearest point, not display coords)
-  segmentEnd: null,     // point index (splice position)
-  segmentStartPt: null, // { lat, lng } — exact coordinate the user set (click or typed)
-  segmentEndPt: null,   // { lat, lng } — exact coordinate the user set
-  suggestions: [],      // [{ route, distance, matchScore, label }]
-  chosenRoute: null,
+  phase: 'IDLE',        // IDLE | FIT_LOADED | BOTH_LOADED | FIXING | FIXED | EXPORTED
+  fitTrack: null,       // parsed broken .fit track
+  gpxTrack: null,       // parsed reference .gpx track
+  fixes: [],            // [{ gapIdx, startIdx, endIdx, route, status:'ok'|'failed' }]
 }
 
 const _subscribers = new Set()

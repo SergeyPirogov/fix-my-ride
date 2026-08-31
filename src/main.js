@@ -2,109 +2,73 @@
 import './style.css'
 import { store } from './store.js'
 import { initTopbar } from './ui/topbar.js'
-import { initSidebar, recordRecentActivity } from './ui/sidebar.js'
+import { initSidebar } from './ui/sidebar.js'
 import { initPanel, showToast } from './ui/panel.js'
 import { parseFit } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
-import { renderTrack, clearTrack, addSuggestionLayer, removeSuggestionLayer } from './map/track-layer.js'
-import { initSelection } from './map/selection.js'
-import { initDrawMode } from './map/draw-mode.js'
-import { fetchSuggestions } from './routing/suggestions.js'
+import { renderFitTrack, renderGpxTrack, renderFixes, clearAll } from './map/track-layer.js'
+import { matchAllGaps } from './routing/gpx-match.js'
 import { buildFixedTrack, writeFit, downloadFit } from './io/fit-writer.js'
 
-async function handleFile(file) {
-  const ext = file.name.split('.').pop().toLowerCase()
-  if (ext !== 'fit' && ext !== 'gpx') {
-    showToast('Only .fit and .gpx files are supported')
+async function handleFitFile(file) {
+  if (!file.name.toLowerCase().endsWith('.fit')) {
+    showToast('Please upload a .fit file for the broken activity')
     return
   }
   try {
-    let track
-    if (ext === 'fit') {
-      const buf = await file.arrayBuffer()
-      track = await parseFit(buf)
-    } else {
-      const text = await file.text()
-      track = parseGpx(text)
-    }
-    recordRecentActivity(track, file.name)
-    // Pre-select first detected gap if any
-    const firstGap = track.gaps[0]
-    const startPt = firstGap ? { lat: track.points[firstGap.startIdx].lat, lng: track.points[firstGap.startIdx].lng } : null
-    const endPt = firstGap ? { lat: track.points[firstGap.endIdx].lat, lng: track.points[firstGap.endIdx].lng } : null
-    store.setState({
-      phase: 'LOADED',
-      track,
-      suggestions: [],
-      chosenRoute: null,
-      segmentStart: firstGap?.startIdx ?? null,
-      segmentEnd: firstGap?.endIdx ?? null,
-      segmentStartPt: startPt,
-      segmentEndPt: endPt,
-    })
+    const buf = await file.arrayBuffer()
+    const fitTrack = await parseFit(buf)
+    store.setState({ phase: 'FIT_LOADED', fitTrack })
   } catch (e) {
-    showToast(e.message || 'Failed to parse file')
+    showToast(e.message || 'Failed to parse .fit file')
+  }
+}
+
+async function handleGpxFile(file) {
+  if (!file.name.toLowerCase().endsWith('.gpx')) {
+    showToast('Please upload a .gpx file for the reference route')
+    return
+  }
+  try {
+    const text = await file.text()
+    const gpxTrack = parseGpx(text)
+    store.setState({ phase: 'BOTH_LOADED', gpxTrack })
+  } catch (e) {
+    showToast(e.message || 'Failed to parse .gpx file')
+  }
+}
+
+async function doAutoFix() {
+  const { fitTrack, gpxTrack } = store.state
+  if (!fitTrack || !gpxTrack) return
+  store.setState({ phase: 'FIXING' })
+
+  if (fitTrack.gaps.length === 0) {
+    store.setState({ phase: 'FIXED', fixes: [] })
+    return
+  }
+
+  const fixes = matchAllGaps(fitTrack, gpxTrack)
+  store.setState({ phase: 'FIXED', fixes })
+
+  const failCount = fixes.filter(f => f.status === 'failed').length
+  if (failCount > 0) {
+    showToast(`${failCount} gap${failCount > 1 ? 's' : ''} had no nearby GPX match`, 'warning')
   }
 }
 
 const map = initMap()
 
 initTopbar()
-
-let suggestionLayer = null
-
-async function doFindRoute(startIdx, endIdx, startPt, endPt) {
-  store.setState({ phase: 'FIXING', segmentStart: startIdx, segmentEnd: endIdx, segmentStartPt: startPt, segmentEndPt: endPt })
-  if (suggestionLayer) { removeSuggestionLayer(map, suggestionLayer); suggestionLayer = null }
-  try {
-    const suggestions = await fetchSuggestions(store.state.track, startIdx, endIdx, startPt, endPt)
-    const chosenRoute = suggestions[0]?.route ?? null
-    if (chosenRoute) suggestionLayer = addSuggestionLayer(map, chosenRoute)
-    store.setState({ phase: 'FIXED', suggestions, chosenRoute })
-  } catch (e) {
-    showToast(e.message, 'warning')
-    store.setState({ phase: 'FIXED', suggestions: [], chosenRoute: null })
-  }
-}
-
-const selection = initSelection(map, {
-  onSegmentChange: (startIdx, endIdx, startPt, endPt) => doFindRoute(startIdx, endIdx, startPt, endPt),
-  onDrawModeToggle: () => {}
-})
-
-initSidebar({ onFile: handleFile, onFindRoute: doFindRoute, onUndo: selection.undo })
-
-const drawMode = initDrawMode(map, {
-  onRouteComplete: (coords) => {
-    if (suggestionLayer) { removeSuggestionLayer(map, suggestionLayer); suggestionLayer = null }
-    suggestionLayer = addSuggestionLayer(map, coords)
-    const manualSuggestion = { route: coords, distance: 0, matchScore: 1, label: 'Manual Route' }
-    const existing = store.state.suggestions
-    store.setState({
-      phase: 'FIXED',
-      suggestions: [manualSuggestion, ...existing.filter(s => s.label !== 'Manual Route')],
-      chosenRoute: coords,
-    })
-  }
-})
-
+initSidebar({ onFitFile: handleFitFile, onGpxFile: handleGpxFile, onAutoFix: doAutoFix })
 initPanel({
-  onChoose: (suggestion) => {
-    if (suggestionLayer) { removeSuggestionLayer(map, suggestionLayer); suggestionLayer = null }
-    suggestionLayer = addSuggestionLayer(map, suggestion.route)
-    store.setState({ chosenRoute: suggestion.route })
-  },
-  onDrawMode: () => drawMode.activate(),
   onDownload: () => {
-    const { track, segmentStart, segmentEnd, chosenRoute } = store.state
-    if (!track || !chosenRoute) {
-      showToast('Choose a route first')
-      return
-    }
+    const { fitTrack, fixes } = store.state
+    if (!fitTrack) { showToast('No track loaded'); return }
     try {
-      const fixedPoints = buildFixedTrack(track, [{ startIdx: segmentStart, endIdx: segmentEnd, route: chosenRoute }])
-      const fitBuffer = writeFit(fixedPoints, track.activityType)
+      const fixedPoints = buildFixedTrack(fitTrack, fixes)
+      const fitBuffer = writeFit(fixedPoints, fitTrack.activityType)
       downloadFit(fitBuffer, `fixed-ride-${Date.now()}.fit`)
       store.setState({ phase: 'EXPORTED' })
     } catch (e) {
@@ -114,11 +78,19 @@ initPanel({
   }
 })
 
-let _lastTrack = null
+let _lastFit = null
+let _lastGpx = null
 store.subscribe(state => {
-  if (state.phase === 'IDLE') { clearTrack(map); _lastTrack = null; return }
-  if (state.track && state.track !== _lastTrack) {
-    _lastTrack = state.track
-    renderTrack(map, state.track)
+  if (state.phase === 'IDLE') { clearAll(map); _lastFit = null; _lastGpx = null; return }
+  if (state.fitTrack && state.fitTrack !== _lastFit) {
+    _lastFit = state.fitTrack
+    renderFitTrack(map, state.fitTrack)
+  }
+  if (state.gpxTrack && state.gpxTrack !== _lastGpx) {
+    _lastGpx = state.gpxTrack
+    renderGpxTrack(map, state.gpxTrack)
+  }
+  if (state.phase === 'FIXED' || state.phase === 'EXPORTED') {
+    renderFixes(map, state.fitTrack, state.fixes)
   }
 })

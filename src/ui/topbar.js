@@ -3,11 +3,11 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-const STEPS = ['Upload', 'Select', 'Fix', 'Export']
+const STEPS = ['Upload FIT', 'Upload GPX', 'Fix', 'Export']
 const PHASE_STEP = {
   IDLE: 0,
-  LOADED: 1, SELECTING: 1,
-  FIXING: 2, FIXED: 2,
+  FIT_LOADED: 1,
+  BOTH_LOADED: 2, FIXING: 2, FIXED: 2,
   EXPORTED: 3,
 }
 

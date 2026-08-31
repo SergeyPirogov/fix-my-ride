@@ -9,17 +9,17 @@ describe('store', () => {
 
   it('setState merges partial state', () => {
     store.reset()
-    store.setState({ phase: 'LOADED' })
-    expect(store.state.phase).toBe('LOADED')
-    expect(store.state.track).toBeNull()
+    store.setState({ phase: 'FIT_LOADED' })
+    expect(store.state.phase).toBe('FIT_LOADED')
+    expect(store.state.gpxTrack).toBeNull()
   })
 
   it('notifies subscribers on setState', () => {
     store.reset()
     const fn = vi.fn()
     const unsub = store.subscribe(fn)
-    store.setState({ phase: 'LOADED' })
-    expect(fn).toHaveBeenCalledWith(expect.objectContaining({ phase: 'LOADED' }))
+    store.setState({ phase: 'FIT_LOADED' })
+    expect(fn).toHaveBeenCalledWith(expect.objectContaining({ phase: 'FIT_LOADED' }))
     unsub()
   })
 
@@ -28,14 +28,14 @@ describe('store', () => {
     const fn = vi.fn()
     const unsub = store.subscribe(fn)
     unsub()
-    store.setState({ phase: 'LOADED' })
+    store.setState({ phase: 'FIT_LOADED' })
     expect(fn).not.toHaveBeenCalled()
   })
 
   it('reset returns to IDLE', () => {
-    store.setState({ phase: 'ROUTE_CHOSEN', segmentStart: 5 })
+    store.setState({ phase: 'FIXED', fixes: [{ gapIdx: 0 }] })
     store.reset()
     expect(store.state.phase).toBe('IDLE')
-    expect(store.state.segmentStart).toBeNull()
+    expect(store.state.fixes).toEqual([])
   })
 })
