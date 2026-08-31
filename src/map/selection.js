@@ -32,6 +32,7 @@ export function initSelection(map, { onSegmentChange }) {
   let modeBar = null
   let hint = null
   let debounceTimer = null
+  let _unsubscribe = null
 
   function notify() {
     if (startIdx !== null && endIdx !== null) {
@@ -109,9 +110,10 @@ export function initSelection(map, { onSegmentChange }) {
     if (modeBar) { modeBar.remove(); modeBar = null }
     if (hint) { hint.remove(); hint = null }
     startIdx = null; endIdx = null
+    if (_unsubscribe) { _unsubscribe(); _unsubscribe = null }
   }
 
-  store.subscribe(state => {
+  _unsubscribe = store.subscribe(state => {
     if (state.phase === 'LOADED') activate(state.track)
     if (state.phase === 'IDLE') deactivate()
   })
