@@ -29,7 +29,16 @@ async function handleFile(file) {
       track = parseGpx(text)
     }
     recordRecentActivity(track, file.name)
-    store.setState({ phase: 'LOADED', track, suggestions: [], chosenRoute: null, segmentStart: null, segmentEnd: null })
+    // Pre-select first detected gap if any
+    const firstGap = track.gaps[0]
+    store.setState({
+      phase: 'LOADED',
+      track,
+      suggestions: [],
+      chosenRoute: null,
+      segmentStart: firstGap?.startIdx ?? null,
+      segmentEnd: firstGap?.endIdx ?? null,
+    })
   } catch (e) {
     showToast(e.message || 'Failed to parse file')
   }

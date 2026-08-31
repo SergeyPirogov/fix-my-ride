@@ -67,9 +67,33 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
       hint.className = 'selection-hint'
       document.getElementById('map').appendChild(hint)
     }
-    setHint(`Click on the track to set the <span class="hint-key">start</span> of the broken segment`)
+
+    const track = store.state.track
+    const { segmentStart, segmentEnd } = store.state
+    if (track && segmentStart !== null && segmentEnd !== null) {
+      startIdx = segmentStart
+      endIdx = segmentEnd
+      startMarker = makeHandle(map, [track.points[startIdx].lat, track.points[startIdx].lng], '#2563EB', 'S')
+      startMarker.on('drag', ev => {
+        startIdx = nearestPointIndex(track, ev.latlng)
+        updateCoordInput('coord-start', track.points[startIdx])
+        clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(notify, DEBOUNCE_MS)
+      })
+      endMarker = makeHandle(map, [track.points[endIdx].lat, track.points[endIdx].lng], '#EF4444', 'E')
+      endMarker.on('drag', ev => {
+        endIdx = nearestPointIndex(track, ev.latlng)
+        updateCoordInput('coord-end', track.points[endIdx])
+        clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(notify, DEBOUNCE_MS)
+      })
+      setHint(`Drag handles to adjust, or click Find Route`)
+    } else {
+      setHint(`Click on the track to set the <span class="hint-key">start</span> of the broken segment`)
+    }
+
     map.on('click', onMapClick)
-    store.setState({ phase: 'SELECTING', segmentStart: null, segmentEnd: null })
+    store.setState({ phase: 'SELECTING' })
   }
 
   function onMapClick(e) {
