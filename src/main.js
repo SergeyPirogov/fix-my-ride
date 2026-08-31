@@ -9,6 +9,7 @@ import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
 import { renderTrack, clearTrack, addSuggestionLayer, removeSuggestionLayer } from './map/track-layer.js'
 import { initSelection } from './map/selection.js'
+import { initDrawMode } from './map/draw-mode.js'
 import { fetchSuggestions } from './routing/suggestions.js'
 import { buildFixedTrack, writeFit, downloadFit } from './io/fit-writer.js'
 
@@ -39,6 +40,21 @@ const map = initMap()
 initTopbar()
 initSidebar({ onFile: handleFile })
 let suggestionLayer = null
+let drawMode = null
+
+drawMode = initDrawMode(map, {
+  onRouteComplete: (coords) => {
+    if (suggestionLayer) removeSuggestionLayer(map, suggestionLayer)
+    suggestionLayer = addSuggestionLayer(map, coords)
+    const manualSuggestion = { route: coords, distance: 0, matchScore: 1, label: 'Manual Route' }
+    const existing = store.state.suggestions
+    store.setState({
+      phase: 'ROUTE_CHOSEN',
+      suggestions: [manualSuggestion, ...existing.filter(s => s.label !== 'Manual Route')],
+      chosenRoute: coords,
+    })
+  }
+})
 
 initPanel({
   onChoose: (suggestion) => {
@@ -74,6 +90,10 @@ initSelection(map, {
       showToast(e.message)
       store.setState({ phase: 'LOADED', suggestions: [], chosenRoute: null })
     }
+  },
+  onDrawModeToggle: (entering) => {
+    if (entering) drawMode.activate()
+    else drawMode.deactivate()
   }
 })
 

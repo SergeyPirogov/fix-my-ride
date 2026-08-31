@@ -24,7 +24,7 @@ function makeHandle(map, latlng, color, label) {
   return L.marker(latlng, { icon, draggable: true }).addTo(map)
 }
 
-export function initSelection(map, { onSegmentChange }) {
+export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
   let startMarker = null
   let endMarker = null
   let startIdx = null
@@ -60,6 +60,7 @@ export function initSelection(map, { onSegmentChange }) {
         btn.addEventListener('click', () => {
           modeBar.querySelectorAll('.map-mode-btn').forEach(b => b.classList.remove('active'))
           btn.classList.add('active')
+          onDrawModeToggle(btn.dataset.mode === 'draw')
         })
       })
     }
