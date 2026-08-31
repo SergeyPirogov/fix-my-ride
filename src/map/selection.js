@@ -29,7 +29,6 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
   let endMarker = null
   let startIdx = null
   let endIdx = null
-  let modeBar = null
   let hint = null
   let debounceTimer = null
   let _unsubscribe = null
@@ -37,47 +36,40 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
   function notify() {
     if (startIdx !== null && endIdx !== null) {
       const [s, e] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+      store.setState({ segmentStart: s, segmentEnd: e })
       const dist = Math.abs((store.state.track?.points[e]?.distance ?? 0) - (store.state.track?.points[s]?.distance ?? 0))
       if (dist < 50) {
-        import('../ui/panel.js').then(m => m.showToast('This gap may not need fixing (under 50m)', 'warning'))
+        import('../ui/panel.js').then(m => m.showToast('Gap under 50m — may not need fixing', 'warning'))
       }
       onSegmentChange(s, e)
     }
   }
 
-  function activate(track) {
-    map.off('click', onMapClick)
+  function setHint(text) {
+    if (!hint) return
+    hint.innerHTML = text
+  }
 
-    if (!modeBar) {
-      modeBar = document.createElement('div')
-      modeBar.className = 'map-mode-bar'
-      modeBar.innerHTML = `
-        <button class="map-mode-btn active" data-mode="select">Select Gap</button>
-        <button class="map-mode-btn" data-mode="draw">Draw Route</button>
-      `
-      document.getElementById('map').appendChild(modeBar)
-      modeBar.querySelectorAll('.map-mode-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          modeBar.querySelectorAll('.map-mode-btn').forEach(b => b.classList.remove('active'))
-          btn.classList.add('active')
-          onDrawModeToggle(btn.dataset.mode === 'draw')
-        })
-      })
-    }
+  function activate() {
+    map.off('click', onMapClick)
+    startMarker = null; endMarker = null; startIdx = null; endIdx = null
 
     if (!hint) {
       hint = document.createElement('div')
       hint.className = 'selection-hint'
-      hint.innerHTML = `Click track to set <span class="hint-key">S</span> start and <span class="hint-key">E</span> end of broken segment`
       document.getElementById('map').appendChild(hint)
     }
-
+    setHint(`Click on the track to set the <span class="hint-key">start</span> of the broken segment`)
     map.on('click', onMapClick)
+    store.setState({ phase: 'SELECTING', segmentStart: null, segmentEnd: null })
   }
 
   function onMapClick(e) {
     const track = store.state.track
     if (!track) return
+    const phase = store.state.phase
+    if (phase !== 'SELECTING' && phase !== 'LOADED') return
+
     const idx = nearestPointIndex(track, e.latlng)
     const pt = track.points[idx]
     const latlng = [pt.lat, pt.lng]
@@ -90,7 +82,8 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
         clearTimeout(debounceTimer)
         debounceTimer = setTimeout(notify, DEBOUNCE_MS)
       })
-      hint.innerHTML = `Now click to set <span class="hint-key">E</span> end point`
+      store.setState({ segmentStart: idx })
+      setHint(`Now click to set the <span class="hint-key">end</span> of the broken segment`)
     } else {
       endIdx = idx
       if (endMarker) map.removeLayer(endMarker)
@@ -108,14 +101,13 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
     map.off('click', onMapClick)
     if (startMarker) { map.removeLayer(startMarker); startMarker = null }
     if (endMarker) { map.removeLayer(endMarker); endMarker = null }
-    if (modeBar) { modeBar.remove(); modeBar = null }
     if (hint) { hint.remove(); hint = null }
     startIdx = null; endIdx = null
     if (_unsubscribe) { _unsubscribe(); _unsubscribe = null }
   }
 
   _unsubscribe = store.subscribe(state => {
-    if (state.phase === 'LOADED') activate(state.track)
+    if (state.phase === 'LOADED') activate()
     if (state.phase === 'IDLE') deactivate()
   })
 

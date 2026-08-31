@@ -3,11 +3,12 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-const STEPS = ['Load', 'Fix', 'Export']
+const STEPS = ['Upload', 'Select', 'Fix', 'Export']
 const PHASE_STEP = {
-  IDLE: 0, LOADED: 0,
-  AUTO_FIXING: 1, FIXED: 1,
-  EXPORTED: 2,
+  IDLE: 0,
+  LOADED: 1, SELECTING: 1,
+  FIXING: 2, FIXED: 2,
+  EXPORTED: 3,
 }
 
 export function initTopbar() {

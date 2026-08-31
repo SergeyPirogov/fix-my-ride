@@ -7,9 +7,10 @@ import { initPanel, showToast } from './ui/panel.js'
 import { parseFit } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
-import { renderTrack, clearTrack, renderFixes, clearFixes, addSuggestionLayer, removeSuggestionLayer } from './map/track-layer.js'
+import { renderTrack, clearTrack, addSuggestionLayer, removeSuggestionLayer } from './map/track-layer.js'
+import { initSelection } from './map/selection.js'
 import { initDrawMode } from './map/draw-mode.js'
-import { autoFixAllGaps } from './routing/suggestions.js'
+import { fetchSuggestions } from './routing/suggestions.js'
 import { buildFixedTrack, writeFit, downloadFit } from './io/fit-writer.js'
 
 async function handleFile(file) {
@@ -28,24 +29,9 @@ async function handleFile(file) {
       track = parseGpx(text)
     }
     recordRecentActivity(track, file.name)
-    store.setState({ phase: 'LOADED', track, fixes: [], activeGapIdx: null })
-
-    if (track.gaps.length === 0) {
-      store.setState({ phase: 'FIXED', fixes: [] })
-      return
-    }
-
-    store.setState({ phase: 'AUTO_FIXING' })
-    const fixes = await autoFixAllGaps(track)
-    store.setState({ phase: 'FIXED', fixes })
-
-    const failCount = fixes.filter(f => f.status === 'failed').length
-    if (failCount > 0) {
-      showToast(`${failCount} gap${failCount > 1 ? 's' : ''} could not be auto-routed. Draw them manually.`, 'warning')
-    }
+    store.setState({ phase: 'LOADED', track, suggestions: [], chosenRoute: null, segmentStart: null, segmentEnd: null })
   } catch (e) {
     showToast(e.message || 'Failed to parse file')
-    store.reset()
   }
 }
 
@@ -55,66 +41,70 @@ initTopbar()
 initSidebar({ onFile: handleFile })
 
 let suggestionLayer = null
+
 const drawMode = initDrawMode(map, {
-  onRouteComplete: (coords, gapIdx) => {
+  onRouteComplete: (coords) => {
     if (suggestionLayer) { removeSuggestionLayer(map, suggestionLayer); suggestionLayer = null }
-    const fixes = store.state.fixes.map(f =>
-      f.gapIdx === gapIdx
-        ? { ...f, route: coords, status: 'manual', suggestions: f.suggestions }
-        : f
-    )
-    store.setState({ fixes, phase: 'FIXED', activeGapIdx: null })
+    suggestionLayer = addSuggestionLayer(map, coords)
+    const manualSuggestion = { route: coords, distance: 0, matchScore: 1, label: 'Manual Route' }
+    const existing = store.state.suggestions
+    store.setState({
+      phase: 'FIXED',
+      suggestions: [manualSuggestion, ...existing.filter(s => s.label !== 'Manual Route')],
+      chosenRoute: coords,
+    })
   }
 })
 
 initPanel({
-  onChooseRoute: (gapIdx, suggestion) => {
+  onChoose: (suggestion) => {
     if (suggestionLayer) { removeSuggestionLayer(map, suggestionLayer); suggestionLayer = null }
     suggestionLayer = addSuggestionLayer(map, suggestion.route)
-    const fixes = store.state.fixes.map(f =>
-      f.gapIdx === gapIdx
-        ? { ...f, route: suggestion.route, distance: suggestion.distance, status: f.status === 'failed' ? 'ok' : f.status }
-        : f
-    )
-    store.setState({ fixes })
+    store.setState({ chosenRoute: suggestion.route })
   },
-  onDrawGap: (gapIdx) => {
-    const fix = store.state.fixes.find(f => f.gapIdx === gapIdx)
-    if (!fix) return
-    const startPt = store.state.track.points[fix.startIdx]
-    const endPt = store.state.track.points[fix.endIdx]
-    store.setState({ activeGapIdx: null })
-    drawMode.activate(startPt, endPt, gapIdx)
-  },
+  onDrawMode: () => drawMode.activate(),
   onDownload: () => {
-    const { track, fixes } = store.state
-    if (!track) { showToast('No track loaded'); return }
-    const fixable = fixes.filter(f => f.route)
-    if (fixable.length === 0 && track.gaps.length > 0) {
-      showToast('No routes to apply yet')
+    const { track, segmentStart, segmentEnd, chosenRoute } = store.state
+    if (!track || !chosenRoute) {
+      showToast('Choose a route first')
       return
     }
     try {
-      const fixedPoints = buildFixedTrack(track, fixable)
+      const fixedPoints = buildFixedTrack(track, [{ startIdx: segmentStart, endIdx: segmentEnd, route: chosenRoute }])
       const fitBuffer = writeFit(fixedPoints, track.activityType)
       downloadFit(fitBuffer, `fixed-ride-${Date.now()}.fit`)
       store.setState({ phase: 'EXPORTED' })
     } catch (e) {
-      showToast('Export failed — check browser console for details')
+      showToast('Export failed — check browser console')
       console.error(e)
     }
   }
 })
 
-// Track rendering
+initSelection(map, {
+  onSegmentChange: async (startIdx, endIdx) => {
+    store.setState({ phase: 'FIXING', segmentStart: startIdx, segmentEnd: endIdx })
+    if (suggestionLayer) { removeSuggestionLayer(map, suggestionLayer); suggestionLayer = null }
+    try {
+      const suggestions = await fetchSuggestions(store.state.track, startIdx, endIdx)
+      const chosenRoute = suggestions[0]?.route ?? null
+      if (chosenRoute) {
+        suggestionLayer = addSuggestionLayer(map, chosenRoute)
+      }
+      store.setState({ phase: 'FIXED', suggestions, chosenRoute })
+    } catch (e) {
+      showToast(e.message, 'warning')
+      store.setState({ phase: 'FIXED', suggestions: [], chosenRoute: null })
+    }
+  },
+  onDrawModeToggle: () => {}
+})
+
 let _lastTrack = null
 store.subscribe(state => {
-  if (state.phase === 'IDLE') { clearTrack(map); clearFixes(map); _lastTrack = null; return }
+  if (state.phase === 'IDLE') { clearTrack(map); _lastTrack = null; return }
   if (state.track && state.track !== _lastTrack) {
     _lastTrack = state.track
     renderTrack(map, state.track)
-  }
-  if (state.phase === 'FIXED' || state.phase === 'EXPORTED') {
-    renderFixes(map, state.track, state.fixes)
   }
 })

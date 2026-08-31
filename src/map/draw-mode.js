@@ -1,5 +1,6 @@
 // src/map/draw-mode.js
 import L from 'leaflet'
+import { store } from '../store.js'
 
 export function initDrawMode(map, { onRouteComplete }) {
   let waypoints = []
@@ -7,13 +8,10 @@ export function initDrawMode(map, { onRouteComplete }) {
   let previewLine = null
   let active = false
   let finishBtn = null
-  let _startPt = null
-  let _endPt = null
-  let _gapIdx = null
 
   const icon = L.divIcon({
     className: '',
-    html: '<div style="width:10px;height:10px;border-radius:50%;background:#F59E0B;border:2px solid #fff;box-shadow:0 0 0 1px #F59E0B"></div>',
+    html: '<div style="width:10px;height:10px;border-radius:50%;background:#10B981;border:2px solid #fff;box-shadow:0 0 0 1px #10B981"></div>',
     iconSize: [10, 10],
     iconAnchor: [5, 5],
   })
@@ -26,7 +24,7 @@ export function initDrawMode(map, { onRouteComplete }) {
     if (waypoints.length >= 2) {
       if (previewLine) map.removeLayer(previewLine)
       previewLine = L.polyline(waypoints.map(([lng, lat]) => [lat, lng]), {
-        color: '#F59E0B', weight: 3, dashArray: '6 4',
+        color: '#10B981', weight: 3, dashArray: '6 4',
       }).addTo(map)
     }
   }
@@ -40,31 +38,26 @@ export function initDrawMode(map, { onRouteComplete }) {
     if (previewLine) { map.removeLayer(previewLine); previewLine = null }
     finishBtn?.remove()
     finishBtn = null
-    _startPt = null
-    _endPt = null
-    _gapIdx = null
   }
 
   function finish() {
     if (waypoints.length < 1) return
-    if (!_startPt || !_endPt) return
+    const { track, segmentStart, segmentEnd } = store.state
+    if (!track || segmentStart === null || segmentEnd === null) return
+    const start = track.points[segmentStart]
+    const end = track.points[segmentEnd]
     const full = [
-      [_startPt.lng, _startPt.lat],
+      [start.lng, start.lat],
       ...waypoints,
-      [_endPt.lng, _endPt.lat],
+      [end.lng, end.lat],
     ]
-    const gapIdx = _gapIdx
     deactivate()
-    onRouteComplete(full, gapIdx)
+    onRouteComplete(full)
   }
 
-  function activate(startPt, endPt, gapIdx) {
+  function activate() {
     deactivate()
-    _startPt = startPt
-    _endPt = endPt
-    _gapIdx = gapIdx
     active = true
-    waypoints = []
     map.on('click', onMapClick)
 
     finishBtn = document.createElement('button')

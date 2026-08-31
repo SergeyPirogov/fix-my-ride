@@ -120,6 +120,34 @@ body {
 .upload-icon { font-size: 22px; margin-bottom: 6px; }
 .upload-text { font-size: 12px; color: var(--text-2); line-height: 1.4; }
 .upload-text strong { color: var(--accent); }
+/* Full-page upload (IDLE state) */
+.upload-page { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 24px 20px; gap: 12px; }
+.upload-page-title { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-1); text-align: center; }
+.upload-page-sub { font-size: 12px; color: var(--text-3); text-align: center; margin-bottom: 4px; }
+.upload-zone-large { width: 100%; padding: 32px 16px; }
+.upload-icon-large { font-size: 40px; margin-bottom: 10px; }
+.upload-cta { font-size: 13px; color: var(--text-2); margin-bottom: 4px; }
+.upload-link { color: var(--accent); text-decoration: underline; cursor: pointer; }
+.upload-formats { font-size: 11px; color: var(--text-3); font-family: 'JetBrains Mono', monospace; }
+/* Track meta table */
+.track-meta { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.track-meta-row { display: flex; justify-content: space-between; font-size: 12px; }
+.track-meta-key { color: var(--text-3); }
+.track-meta-val { color: var(--text-1); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.val-broken { color: var(--broken); font-weight: 600; }
+.val-ok { color: var(--success); font-weight: 600; }
+.border-b { border-bottom: 1px solid var(--border); }
+/* Instruction steps */
+.instruction-steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.instruction-step { display: flex; gap: 10px; align-items: flex-start; font-size: 12px; color: var(--text-3); line-height: 1.4; opacity: 0.5; }
+.instruction-step.step-active { color: var(--text-1); opacity: 1; }
+.instruction-step.step-done { color: var(--success); opacity: 1; }
+.step-dot { min-width: 20px; height: 20px; border-radius: 50%; background: var(--bg-3); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+.instruction-step.step-active .step-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.instruction-step.step-done .step-dot { background: var(--success-subtle); border-color: var(--success); color: var(--success); }
+.gap-hint { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--warning-text); background: var(--warning-subtle); border: 1px solid var(--warning-border); border-radius: 6px; padding: 6px 10px; }
+.gap-hint-icon { font-size: 13px; }
+.no-gaps-msg { font-size: 12px; color: var(--success); padding: 8px 0; }
 .activity-list { flex: 1; overflow-y: auto; padding: 8px 0; }
 .select-prompt { padding: 16px; border-bottom: 1px solid var(--border); background: var(--bg-2); }
 .select-prompt-title { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--broken); margin-bottom: 2px; }
