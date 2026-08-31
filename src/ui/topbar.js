@@ -3,10 +3,11 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-const STEPS = ['Load', 'Select', 'Fix', 'Export']
+const STEPS = ['Load', 'Fix', 'Export']
 const PHASE_STEP = {
-  IDLE: 0, LOADED: 1, SEGMENT_SELECTED: 1,
-  FIXING: 2, ROUTE_CHOSEN: 2, EXPORTED: 3,
+  IDLE: 0, LOADED: 0,
+  AUTO_FIXING: 1, FIXED: 1,
+  EXPORTED: 2,
 }
 
 export function initTopbar() {
@@ -38,7 +39,6 @@ export function initTopbar() {
       <div class="topbar-actions">
         <button class="theme-toggle" id="theme-toggle">◐</button>
         ${state.phase !== 'IDLE' ? '<button class="btn btn-ghost" id="btn-reset">Discard</button>' : ''}
-        ${state.phase === 'ROUTE_CHOSEN' ? '<button class="btn btn-primary" id="btn-apply">Apply Fix</button>' : ''}
       </div>
     `
     document.getElementById('theme-toggle')?.addEventListener('click', () => {
@@ -46,9 +46,6 @@ export function initTopbar() {
       root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark')
     })
     document.getElementById('btn-reset')?.addEventListener('click', () => store.reset())
-    document.getElementById('btn-apply')?.addEventListener('click', () =>
-      store.setState({ phase: 'EXPORTED' })
-    )
   }
 
   render(store.state)

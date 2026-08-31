@@ -28,12 +28,7 @@ function sampleRouteAt10m(routeCoords) {
   return result
 }
 
-export function buildFixedTrack(track, startIdx, endIdx, routeCoords) {
-  const { points } = track
-  const before = points.slice(0, startIdx)
-  const after = points.slice(endIdx + 1)
-
-  // Average HR/power/cadence from last 5 points before gap
+function buildSegmentInsert(points, startIdx, endIdx, routeCoords) {
   const preGap = points.slice(Math.max(0, startIdx - 4), startIdx + 1)
   const avgHr = preGap.some(p => p.hr != null)
     ? Math.round(preGap.filter(p => p.hr != null).reduce((s, p) => s + p.hr, 0) / preGap.filter(p => p.hr != null).length)
@@ -51,7 +46,6 @@ export function buildFixedTrack(track, startIdx, endIdx, routeCoords) {
   const gapStartDist = startPt.distance
 
   const sampled = sampleRouteAt10m(routeCoords)
-  // Compute cumulative distance along sampled route
   let cumulDist = 0
   const sampledWithDist = sampled.map((pt, i) => {
     if (i > 0) cumulDist += haversineDistance(sampled[i - 1], pt)
@@ -59,24 +53,46 @@ export function buildFixedTrack(track, startIdx, endIdx, routeCoords) {
   })
   const totalRouteDist = cumulDist || 1
 
-  const inserted = sampledWithDist.map((pt, i) => {
+  return sampledWithDist.map(pt => {
     const frac = pt.localDist / totalRouteDist
-    const ele = startPt.ele + (endPt.ele - startPt.ele) * frac
-    const timestamp = startPt.timestamp + gapDuration * frac
-    const distance = gapStartDist + pt.localDist
-    return { lat: pt.lat, lng: pt.lng, ele, timestamp, hr: avgHr, power: avgPower, cadence: avgCadence, distance }
+    return {
+      lat: pt.lat, lng: pt.lng,
+      ele: startPt.ele + (endPt.ele - startPt.ele) * frac,
+      timestamp: startPt.timestamp + gapDuration * frac,
+      hr: avgHr, power: avgPower, cadence: avgCadence,
+      distance: gapStartDist + pt.localDist,
+    }
   })
+}
 
-  // inserted covers startIdx..endIdx inclusive; before ends before startIdx, after starts after endIdx
-  const middle = inserted
+// fixes: [{ startIdx, endIdx, route }] sorted by startIdx ascending
+export function buildFixedTrack(track, fixes) {
+  const { points } = track
+  // Sort fixes by startIdx so we process in order
+  const sorted = [...fixes].filter(f => f.route).sort((a, b) => a.startIdx - b.startIdx)
 
-  // Rebuild result and recalculate cumulative distance
-  const combined = [...before, ...middle, ...after]
+  if (sorted.length === 0) return [...points]
+
+  const parts = []
+  let cursor = 0
+
+  for (const fix of sorted) {
+    parts.push(...points.slice(cursor, fix.startIdx))
+    parts.push(...buildSegmentInsert(points, fix.startIdx, fix.endIdx, fix.route))
+    cursor = fix.endIdx + 1
+  }
+  parts.push(...points.slice(cursor))
+
   let runDist = 0
-  return combined.map((pt, i) => {
-    if (i > 0) runDist += haversineDistance(combined[i - 1], pt)
+  return parts.map((pt, i) => {
+    if (i > 0) runDist += haversineDistance(parts[i - 1], pt)
     return { ...pt, distance: Math.round(runDist) }
   })
+}
+
+// Legacy single-segment helper kept for draw-mode compatibility
+export function buildFixedTrackSingle(track, startIdx, endIdx, routeCoords) {
+  return buildFixedTrack(track, [{ startIdx, endIdx, route: routeCoords }])
 }
 
 export function writeFit(points, activityType) {

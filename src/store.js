@@ -1,11 +1,9 @@
 // src/store.js
 const INITIAL_STATE = {
-  phase: 'IDLE',         // IDLE | LOADED | SEGMENT_SELECTED | FIXING | ROUTE_CHOSEN | EXPORTED
-  track: null,           // internal track format (see spec)
-  segmentStart: null,    // point index
-  segmentEnd: null,      // point index
-  suggestions: [],       // array of { route, distance, matchScore, label }
-  chosenRoute: null,     // GeoJSON LineString coordinates array
+  phase: 'IDLE',         // IDLE | LOADED | AUTO_FIXING | FIXED | EXPORTED
+  track: null,           // internal track format
+  fixes: [],             // [{ gapIdx, startIdx, endIdx, route, status:'ok'|'failed'|'manual', suggestions, distance }]
+  activeGapIdx: null,    // which gap the redraw panel is open for
 }
 
 const _subscribers = new Set()

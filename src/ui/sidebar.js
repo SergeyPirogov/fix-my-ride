@@ -38,62 +38,94 @@ export function initSidebar({ onFile }) {
   _unsubscribe = store.subscribe(state => {
     const list = document.getElementById('activity-list')
     if (!list) return
-    const stored = JSON.parse(sessionStorage.getItem('recentActivities') || '[]')
 
     if (state.phase === 'LOADED' && state.track) {
       const t = state.track
       const totalDist = t.points[t.points.length - 1]?.distance ?? 0
-      const gapCount = t.gaps.length
       const startPt = t.points[0]
       const endPt = t.points[t.points.length - 1]
-      const fmt = (v) => v.toFixed(4)
+      const fmt = v => v.toFixed(4)
       const startTs = startPt?.timestamp ? new Date(startPt.timestamp).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : ''
       const endTs = endPt?.timestamp ? new Date(endPt.timestamp).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : ''
       list.innerHTML = `
         <div class="select-prompt">
-          <div class="select-prompt-title">${gapCount > 0 ? `${gapCount} broken segment${gapCount > 1 ? 's' : ''} detected` : 'Route loaded'}</div>
+          <div class="select-prompt-title">${t.gaps.length > 0 ? `${t.gaps.length} broken segment${t.gaps.length > 1 ? 's' : ''} detected` : 'Route loaded — no gaps'}</div>
           <div class="select-prompt-dist">${(totalDist / 1000).toFixed(1)} km · ${t.activityType}</div>
           <div class="track-endpoints">
             <div class="track-ep"><span class="track-ep-label">Start</span><span class="track-ep-coord">${fmt(startPt.lat)}, ${fmt(startPt.lng)}</span>${startTs ? `<span class="track-ep-time">${startTs}</span>` : ''}</div>
             <div class="track-ep-arrow">↓</div>
             <div class="track-ep"><span class="track-ep-label">End</span><span class="track-ep-coord">${fmt(endPt.lat)}, ${fmt(endPt.lng)}</span>${endTs ? `<span class="track-ep-time">${endTs}</span>` : ''}</div>
           </div>
-          <div class="select-prompt-steps">
-            <div class="select-step"><span class="select-step-badge">1</span>Click on the map to set the <strong>start</strong> of the broken segment</div>
-            <div class="select-step"><span class="select-step-badge">2</span>Click again to set the <strong>end</strong> of the broken segment</div>
-            <div class="select-step"><span class="select-step-badge">3</span>We'll find road-snapped routes to fix it</div>
-          </div>
+          ${t.gaps.length > 0 ? `<div class="auto-fix-hint">Fixing routes automatically…</div>` : ''}
         </div>
-        ${stored.length ? `
-          <div class="sidebar-label" style="padding: 10px 16px 4px;">Recent</div>
-          ${stored.map((a, i) => `
-            <div class="activity-item ${i === 0 ? 'active' : ''}">
-              <div class="act-icon">${a.activityType === 'running' ? '🏃' : '🚴'}</div>
-              <div class="act-meta">
-                <div class="act-name">${a.name}</div>
-                <div class="act-detail">${a.date} · ${(a.distance / 1000).toFixed(1)}km</div>
-              </div>
-              <span class="badge ${a.gaps > 0 ? 'badge-broken' : 'badge-fixed'}">${a.gaps > 0 ? 'Broken' : 'Fixed'}</span>
-            </div>
-          `).join('')}
-        ` : ''}
       `
       return
     }
 
-    list.innerHTML = stored.length ? `
-      <div class="sidebar-label" style="padding: 10px 16px 4px;">Recent</div>
-      ${stored.map((a, i) => `
-        <div class="activity-item ${i === 0 && state.phase !== 'IDLE' ? 'active' : ''}">
-          <div class="act-icon">${a.activityType === 'running' ? '🏃' : '🚴'}</div>
-          <div class="act-meta">
-            <div class="act-name">${a.name}</div>
-            <div class="act-detail">${a.date} · ${(a.distance / 1000).toFixed(1)}km</div>
+    if (state.phase === 'AUTO_FIXING' && state.track) {
+      const t = state.track
+      const totalDist = t.points[t.points.length - 1]?.distance ?? 0
+      list.innerHTML = `
+        <div class="select-prompt">
+          <div class="select-prompt-title">Fixing ${t.gaps.length} segment${t.gaps.length > 1 ? 's' : ''}…</div>
+          <div class="select-prompt-dist">${(totalDist / 1000).toFixed(1)} km · ${t.activityType}</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding:0 2px">
+            <div class="spinner"></div>
+            <div style="font-size:12px;color:var(--text-3)">Querying road routes…</div>
           </div>
-          <span class="badge ${a.gaps > 0 ? 'badge-broken' : 'badge-fixed'}">${a.gaps > 0 ? 'Broken' : 'Fixed'}</span>
         </div>
-      `).join('')}
-    ` : ''
+      `
+      return
+    }
+
+    if ((state.phase === 'FIXED' || state.phase === 'EXPORTED') && state.track) {
+      const t = state.track
+      const totalDist = t.points[t.points.length - 1]?.distance ?? 0
+      const okCount = state.fixes.filter(f => f.status === 'ok' || f.status === 'manual').length
+      const failCount = state.fixes.filter(f => f.status === 'failed').length
+      list.innerHTML = `
+        <div class="select-prompt">
+          <div class="select-prompt-title">${okCount} fixed${failCount > 0 ? ` · ${failCount} failed` : ''}</div>
+          <div class="select-prompt-dist">${(totalDist / 1000).toFixed(1)} km · ${t.activityType}</div>
+        </div>
+        <div class="gap-list">
+          ${state.fixes.map((fix, i) => {
+            const startPt = t.points[fix.startIdx]
+            const endPt = t.points[fix.endIdx]
+            const gapDist = ((endPt.distance - startPt.distance) / 1000).toFixed(1)
+            const statusLabel = fix.status === 'ok' ? 'Fixed' : fix.status === 'manual' ? 'Manual' : 'Failed'
+            const statusClass = fix.status === 'ok' ? 'badge-fixed' : fix.status === 'manual' ? 'badge-manual' : 'badge-broken'
+            const isActive = state.activeGapIdx === fix.gapIdx
+            return `
+              <div class="gap-item ${isActive ? 'gap-item-active' : ''}" data-gap="${fix.gapIdx}">
+                <div class="gap-item-header">
+                  <span class="gap-item-label">Gap ${i + 1}</span>
+                  <span class="badge ${statusClass}">${statusLabel}</span>
+                </div>
+                <div class="gap-item-dist">${gapDist} km gap</div>
+                <button class="btn btn-ghost btn-sm gap-redraw-btn" data-gap="${fix.gapIdx}">Redraw</button>
+              </div>
+            `
+          }).join('')}
+        </div>
+      `
+      list.querySelectorAll('.gap-redraw-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation()
+          const gapIdx = parseInt(btn.dataset.gap)
+          store.setState({ activeGapIdx: gapIdx })
+        })
+      })
+      list.querySelectorAll('.gap-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const gapIdx = parseInt(item.dataset.gap)
+          store.setState({ activeGapIdx: state.activeGapIdx === gapIdx ? null : gapIdx })
+        })
+      })
+      return
+    }
+
+    list.innerHTML = ''
   })
 }
 
@@ -102,7 +134,7 @@ export function recordRecentActivity(track, filename) {
   const totalDist = track.points[track.points.length - 1]?.distance ?? 0
   const ts = track.points[0]?.timestamp
   const date = ts ? new Date(ts).toLocaleDateString('en', { month: 'short', day: 'numeric' }) : ''
-  const name = filename.replace(/\.(fit|gpx)$/i, '').replace(/[<>"'&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c]))
+  const name = filename.replace(/\.(fit|gpx)$/i, '').replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c]))
   stored.unshift({ name, activityType: track.activityType, date, distance: totalDist, gaps: track.gaps.length })
   sessionStorage.setItem('recentActivities', JSON.stringify(stored.slice(0, 10)))
 }

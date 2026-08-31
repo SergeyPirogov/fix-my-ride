@@ -144,6 +144,18 @@ body {
 .badge { font-size: 10px; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; letter-spacing: 0.06em; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
 .badge-broken { background: var(--error-subtle); color: var(--error-text); }
 .badge-fixed { background: var(--success-subtle); color: var(--success); }
+.badge-manual { background: var(--warning-subtle); color: var(--warning-text); }
+/* Gap list in sidebar */
+.gap-list { overflow-y: auto; flex: 1; }
+.gap-item { padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+.gap-item:hover { background: var(--bg-2); }
+.gap-item-active { background: var(--accent-subtle); }
+.gap-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+.gap-item-label { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+.gap-item-dist { font-size: 11px; color: var(--text-3); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; }
+.gap-redraw-btn { font-size: 11px; padding: 3px 8px; }
+.auto-fix-hint { font-size: 11px; color: var(--text-3); margin-top: 8px; font-style: italic; }
+.btn-sm { font-size: 11px; padding: 3px 8px; }
 /* Right panel */
 .right-panel { width: 300px; flex-shrink: 0; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
 .panel-header { padding: 14px 16px; border-bottom: 1px solid var(--border); }

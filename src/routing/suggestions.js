@@ -23,3 +23,32 @@ export async function fetchSuggestions(track, startIdx, endIdx) {
     label: i === 0 ? 'Shortest Route' : i === 1 ? 'Alternative Route' : `Option ${i + 1}`,
   })).sort((a, b) => b.matchScore - a.matchScore)
 }
+
+export async function autoFixAllGaps(track) {
+  const results = await Promise.allSettled(
+    track.gaps.map((gap, gapIdx) =>
+      fetchSuggestions(track, gap.startIdx, gap.endIdx).then(suggestions => ({
+        gapIdx,
+        startIdx: gap.startIdx,
+        endIdx: gap.endIdx,
+        suggestions,
+        route: suggestions[0]?.route ?? null,
+        distance: suggestions[0]?.distance ?? 0,
+        status: suggestions[0] ? 'ok' : 'failed',
+      }))
+    )
+  )
+
+  return results.map((r, gapIdx) => {
+    if (r.status === 'fulfilled') return r.value
+    return {
+      gapIdx,
+      startIdx: track.gaps[gapIdx].startIdx,
+      endIdx: track.gaps[gapIdx].endIdx,
+      suggestions: [],
+      route: null,
+      distance: 0,
+      status: 'failed',
+    }
+  })
+}
