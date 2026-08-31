@@ -31,29 +31,41 @@ function sampleGpxAt10m(gpxPoints) {
   return result
 }
 
-// Interpolates hr/power/cadence from the fit track's own samples at a given
-// fraction of elapsed time — preserves the recorded performance data while
-// the geographic path is replaced by the gpx route.
-function sampleFitMetricAt(fitPoints, frac, key) {
-  const withValue = fitPoints.filter(p => p[key] != null)
-  if (withValue.length === 0) return null
-  const targetTs = fitPoints[0].timestamp + frac * (fitPoints[fitPoints.length - 1].timestamp - fitPoints[0].timestamp)
-  let lo = withValue[0]
-  for (const p of withValue) {
-    if (p.timestamp > targetTs) break
-    lo = p
+// Linearly interpolates a fit metric (hr/power/cadence/timestamp) at a given
+// distance along the fit track's own (noisy but monotonic) distance field.
+// Using the fit's real distance-vs-time/metric curve — instead of assuming
+// constant pace — is what keeps HR/power varying naturally instead of
+// flat-lining wherever the rider's real pace differed from the average.
+function sampleFitAtDistance(fitPoints, targetDist, key) {
+  const first = fitPoints[0]
+  const last = fitPoints[fitPoints.length - 1]
+  if (targetDist <= first.distance) return first[key]
+  if (targetDist >= last.distance) return last[key]
+
+  let lo = first, hi = last
+  for (let i = 1; i < fitPoints.length; i++) {
+    if (fitPoints[i].distance >= targetDist) { hi = fitPoints[i]; lo = fitPoints[i - 1]; break }
   }
-  return lo[key]
+  const span = hi.distance - lo.distance
+  const frac = span > 0 ? (targetDist - lo.distance) / span : 0
+
+  if (key === 'timestamp') return lo.timestamp + (hi.timestamp - lo.timestamp) * frac
+  // hr/power/cadence: step to whichever endpoint is nearer in distance rather
+  // than averaging two readings that may span a real physiological change
+  const loVal = lo[key], hiVal = hi[key]
+  if (loVal == null) return hiVal
+  if (hiVal == null) return loVal
+  return frac < 0.5 ? loVal : hiVal
 }
 
 // Replaces the entire route's geography with the gpx reference path, while
-// keeping the fit track's recorded timing/HR/power/cadence by remapping
-// them proportionally: gpx distance-fraction -> fit time-fraction.
+// keeping the fit track's recorded timing/HR/power/cadence: gpx points are
+// remapped by distance-fraction onto the fit's own distance-vs-metric curve,
+// so variable pace (stops, sprints, hills) still produces varying HR/power
+// instead of the constant-pace assumption flat-lining long stretches.
 export function buildFixedTrackFromGpx(fitTrack, gpxTrack) {
   const fitPoints = fitTrack.points
-  const startPt = fitPoints[0]
-  const endPt = fitPoints[fitPoints.length - 1]
-  const duration = endPt.timestamp - startPt.timestamp
+  const fitTotalDist = fitPoints[fitPoints.length - 1].distance || 1
 
   const sampled = sampleGpxAt10m(gpxTrack.points)
   let cumulDist = 0
@@ -65,14 +77,15 @@ export function buildFixedTrackFromGpx(fitTrack, gpxTrack) {
 
   return sampledWithDist.map(pt => {
     const frac = pt.localDist / totalDist
+    const fitTargetDist = frac * fitTotalDist
     return {
       lat: pt.lat,
       lng: pt.lng,
       ele: pt.ele,
-      timestamp: startPt.timestamp + duration * frac,
-      hr: sampleFitMetricAt(fitPoints, frac, 'hr'),
-      power: sampleFitMetricAt(fitPoints, frac, 'power'),
-      cadence: sampleFitMetricAt(fitPoints, frac, 'cadence'),
+      timestamp: sampleFitAtDistance(fitPoints, fitTargetDist, 'timestamp'),
+      hr: sampleFitAtDistance(fitPoints, fitTargetDist, 'hr'),
+      power: sampleFitAtDistance(fitPoints, fitTargetDist, 'power'),
+      cadence: sampleFitAtDistance(fitPoints, fitTargetDist, 'cadence'),
       distance: Math.round(pt.localDist),
     }
   })
