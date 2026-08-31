@@ -38,9 +38,24 @@ async function handleFile(file) {
 const map = initMap()
 
 initTopbar()
-initSidebar({ onFile: handleFile })
 
 let suggestionLayer = null
+
+async function doFindRoute(startIdx, endIdx) {
+  store.setState({ phase: 'FIXING', segmentStart: startIdx, segmentEnd: endIdx })
+  if (suggestionLayer) { removeSuggestionLayer(map, suggestionLayer); suggestionLayer = null }
+  try {
+    const suggestions = await fetchSuggestions(store.state.track, startIdx, endIdx)
+    const chosenRoute = suggestions[0]?.route ?? null
+    if (chosenRoute) suggestionLayer = addSuggestionLayer(map, chosenRoute)
+    store.setState({ phase: 'FIXED', suggestions, chosenRoute })
+  } catch (e) {
+    showToast(e.message, 'warning')
+    store.setState({ phase: 'FIXED', suggestions: [], chosenRoute: null })
+  }
+}
+
+initSidebar({ onFile: handleFile, onFindRoute: doFindRoute })
 
 const drawMode = initDrawMode(map, {
   onRouteComplete: (coords) => {
@@ -82,21 +97,7 @@ initPanel({
 })
 
 initSelection(map, {
-  onSegmentChange: async (startIdx, endIdx) => {
-    store.setState({ phase: 'FIXING', segmentStart: startIdx, segmentEnd: endIdx })
-    if (suggestionLayer) { removeSuggestionLayer(map, suggestionLayer); suggestionLayer = null }
-    try {
-      const suggestions = await fetchSuggestions(store.state.track, startIdx, endIdx)
-      const chosenRoute = suggestions[0]?.route ?? null
-      if (chosenRoute) {
-        suggestionLayer = addSuggestionLayer(map, chosenRoute)
-      }
-      store.setState({ phase: 'FIXED', suggestions, chosenRoute })
-    } catch (e) {
-      showToast(e.message, 'warning')
-      store.setState({ phase: 'FIXED', suggestions: [], chosenRoute: null })
-    }
-  },
+  onSegmentChange: (startIdx, endIdx) => doFindRoute(startIdx, endIdx),
   onDrawModeToggle: () => {}
 })
 

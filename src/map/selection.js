@@ -33,11 +33,19 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
   let debounceTimer = null
   let _unsubscribe = null
 
+  function updateCoordInput(id, pt) {
+    const el = document.getElementById(id)
+    if (el) el.value = `${pt.lat.toFixed(4)}, ${pt.lng.toFixed(4)}`
+  }
+
   function notify() {
     if (startIdx !== null && endIdx !== null) {
       const [s, e] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
       store.setState({ segmentStart: s, segmentEnd: e })
-      const dist = Math.abs((store.state.track?.points[e]?.distance ?? 0) - (store.state.track?.points[s]?.distance ?? 0))
+      const track = store.state.track
+      updateCoordInput('coord-start', track.points[s])
+      updateCoordInput('coord-end', track.points[e])
+      const dist = Math.abs((track?.points[e]?.distance ?? 0) - (track?.points[s]?.distance ?? 0))
       if (dist < 50) {
         import('../ui/panel.js').then(m => m.showToast('Gap under 50m — may not need fixing', 'warning'))
       }
@@ -79,10 +87,12 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
       startMarker = makeHandle(map, latlng, '#2563EB', 'S')
       startMarker.on('drag', ev => {
         startIdx = nearestPointIndex(track, ev.latlng)
+        updateCoordInput('coord-start', track.points[startIdx])
         clearTimeout(debounceTimer)
         debounceTimer = setTimeout(notify, DEBOUNCE_MS)
       })
       store.setState({ segmentStart: idx })
+      updateCoordInput('coord-start', pt)
       setHint(`Now click to set the <span class="hint-key">end</span> of the broken segment`)
     } else {
       endIdx = idx

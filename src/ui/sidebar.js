@@ -3,20 +3,20 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-export function initSidebar({ onFile }) {
+export function initSidebar({ onFile, onFindRoute }) {
   const el = document.getElementById('sidebar')
   el.className = 'sidebar'
 
   // Initial render
-  renderSidebar(el, onFile, store.state)
+  renderSidebar(el, onFile, onFindRoute, store.state)
 
   if (_unsubscribe) _unsubscribe()
   _unsubscribe = store.subscribe(state => {
-    renderSidebar(el, onFile, state)
+    renderSidebar(el, onFile, onFindRoute, state)
   })
 }
 
-function renderSidebar(el, onFile, state) {
+function renderSidebar(el, onFile, onFindRoute, state) {
   if (state.phase === 'IDLE') {
     el.innerHTML = `
       <div class="upload-page">
@@ -58,36 +58,70 @@ function renderSidebar(el, onFile, state) {
           <div class="track-ep"><span class="track-ep-label">End</span><span class="track-ep-coord">${fmt(endPt.lat)}, ${fmt(endPt.lng)}</span>${endTs ? `<span class="track-ep-time">${endTs}</span>` : ''}</div>
         </div>
       </div>
-      ${t.gaps.length > 0 ? `
-        <div class="sidebar-section">
-          <div class="sidebar-label">Select Broken Segment</div>
-          <div class="instruction-steps">
-            <div class="instruction-step ${state.segmentStart === null ? 'step-active' : 'step-done'}">
-              <div class="step-dot">${state.segmentStart !== null ? '✓' : '1'}</div>
-              <div class="step-text">Click on map — set <strong>start</strong> of broken segment</div>
-            </div>
-            <div class="instruction-step ${state.segmentStart !== null && state.segmentEnd === null ? 'step-active' : state.segmentEnd !== null ? 'step-done' : ''}">
-              <div class="step-dot">${state.segmentEnd !== null ? '✓' : '2'}</div>
-              <div class="step-text">Click again — set <strong>end</strong> of broken segment</div>
-            </div>
-            <div class="instruction-step">
-              <div class="step-dot">3</div>
-              <div class="step-text">We find road-snapped routes</div>
-            </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Broken Segment</div>
+        ${t.gaps.length > 0 ? `
+          <div class="gap-hint" style="margin-bottom:12px">
+            <span class="gap-hint-icon">⚠</span>
+            ${t.gaps.length} gap${t.gaps.length > 1 ? 's' : ''} detected — red dashed on map
           </div>
-          ${t.gaps.length > 0 ? `
-            <div class="gap-hint">
-              <span class="gap-hint-icon">⚠</span>
-              ${t.gaps.length} broken segment${t.gaps.length > 1 ? 's' : ''} detected — red dashed lines on map
-            </div>
-          ` : ''}
+        ` : ''}
+        <div class="coord-field">
+          <label class="coord-label">Start point</label>
+          <input class="coord-input" id="coord-start" type="text" placeholder="48.2100, 16.3700" value="${state.segmentStart !== null ? `${fmt(t.points[state.segmentStart].lat)}, ${fmt(t.points[state.segmentStart].lng)}` : ''}" />
+          <div class="coord-hint" id="coord-start-hint">${state.segmentStart !== null ? `Snapped to point ${state.segmentStart}` : 'Or click on map'}</div>
         </div>
-      ` : `
-        <div class="sidebar-section">
-          <div class="no-gaps-msg">No gaps detected. Track looks clean!</div>
+        <div class="coord-field">
+          <label class="coord-label">End point</label>
+          <input class="coord-input" id="coord-end" type="text" placeholder="48.2200, 16.3850" value="${state.segmentEnd !== null ? `${fmt(t.points[state.segmentEnd].lat)}, ${fmt(t.points[state.segmentEnd].lng)}` : ''}" />
+          <div class="coord-hint" id="coord-end-hint">${state.segmentEnd !== null ? `Snapped to point ${state.segmentEnd}` : 'Or click on map'}</div>
         </div>
-      `}
+        <button class="btn btn-primary" id="btn-find-route" style="width:100%;margin-top:10px" ${state.segmentStart === null || state.segmentEnd === null ? 'disabled' : ''}>Find Route →</button>
+        ${t.gaps.length === 0 ? '<div class="no-gaps-msg" style="margin-top:8px">No gaps detected — track looks clean</div>' : ''}
+      </div>
     `
+
+    // Wire coord inputs — parse lat,lng and snap to nearest track point
+    function parseCoord(str) {
+      const m = str.match(/(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/)
+      if (!m) return null
+      return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) }
+    }
+    function nearestIdx(lat, lng) {
+      let minD = Infinity, minI = 0
+      t.points.forEach((p, i) => {
+        const d = Math.hypot(p.lat - lat, p.lng - lng)
+        if (d < minD) { minD = d; minI = i }
+      })
+      return minI
+    }
+    function updateBtn() {
+      const btn = el.querySelector('#btn-find-route')
+      if (btn) btn.disabled = store.state.segmentStart === null || store.state.segmentEnd === null
+    }
+
+    el.querySelector('#coord-start')?.addEventListener('input', e => {
+      const c = parseCoord(e.target.value)
+      if (!c) { el.querySelector('#coord-start-hint').textContent = 'Invalid — use: lat, lng'; return }
+      const idx = nearestIdx(c.lat, c.lng)
+      el.querySelector('#coord-start-hint').textContent = `Snapped to point ${idx}`
+      store.setState({ segmentStart: idx })
+      updateBtn()
+    })
+    el.querySelector('#coord-end')?.addEventListener('input', e => {
+      const c = parseCoord(e.target.value)
+      if (!c) { el.querySelector('#coord-end-hint').textContent = 'Invalid — use: lat, lng'; return }
+      const idx = nearestIdx(c.lat, c.lng)
+      el.querySelector('#coord-end-hint').textContent = `Snapped to point ${idx}`
+      store.setState({ segmentEnd: idx })
+      updateBtn()
+    })
+    el.querySelector('#btn-find-route')?.addEventListener('click', () => {
+      const { segmentStart, segmentEnd } = store.state
+      if (segmentStart !== null && segmentEnd !== null) {
+        onFindRoute(segmentStart, segmentEnd)
+      }
+    })
     return
   }
 
