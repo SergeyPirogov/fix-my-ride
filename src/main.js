@@ -97,7 +97,7 @@ initSelection(map, {
   }
 })
 
-store.subscribe(state => {
+const _unsubTrack = store.subscribe(state => {
   if (state.phase === 'IDLE') { clearTrack(map); return }
   if (state.track) renderTrack(map, state.track)
 })
