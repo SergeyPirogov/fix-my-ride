@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite'
 
-// GitHub Pages serves project sites from https://<user>.github.io/<repo>/ —
-// asset URLs need that repo-name prefix in production, but not in local dev.
+// Served from a custom domain (automation-remarks.com) at the root, not
+// under /fix-my-ride/ — no base prefix needed for GitHub Pages here.
 export default defineConfig({
-  base: process.env.GITHUB_PAGES ? '/fix-my-ride/' : '/',
+  base: '/',
   server: { port: 5173 },
   test: {
     environment: 'jsdom',
