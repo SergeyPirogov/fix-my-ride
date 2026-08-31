@@ -8,6 +8,8 @@ import { parseFit } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
 import { renderTrack, clearTrack } from './map/track-layer.js'
+import { initSelection } from './map/selection.js'
+// TODO: import { fetchSuggestions } from './routing/suggestions.js'  // will be created in Task 7
 
 async function handleFile(file) {
   const ext = file.name.split('.').pop().toLowerCase()
@@ -36,6 +38,13 @@ const map = initMap()
 initTopbar()
 initSidebar({ onFile: handleFile })
 initPanel({ onChoose: () => {}, onDownload: () => {} })
+
+initSelection(map, {
+  onSegmentChange: async (startIdx, endIdx) => {
+    store.setState({ phase: 'SEGMENT_SELECTED', segmentStart: startIdx, segmentEnd: endIdx })
+    // Task 7 will wire fetchSuggestions here
+  }
+})
 
 store.subscribe(state => {
   if (state.phase === 'IDLE') { clearTrack(map); return }
