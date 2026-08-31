@@ -4,6 +4,7 @@ const INITIAL_STATE = {
   fitTrack: null,       // parsed broken .fit track
   gpxTrack: null,       // parsed reference .gpx track
   fixes: [],            // [{ gapIdx, startIdx, endIdx, route, status:'ok'|'failed' }]
+  fixedPoints: null,    // the actual corrected point array — same data written to the exported .fit
 }
 
 const _subscribers = new Set()

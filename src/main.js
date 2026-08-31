@@ -7,7 +7,7 @@ import { initPanel, showToast } from './ui/panel.js'
 import { parseFit } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
-import { renderFitTrack, renderGpxTrack, renderFixes, clearAll } from './map/track-layer.js'
+import { renderFitTrack, renderGpxTrack, renderFixedTrack, clearAll } from './map/track-layer.js'
 import { matchAllGaps } from './routing/gpx-match.js'
 import { buildFixedTrack, writeFit, downloadFit } from './io/fit-writer.js'
 
@@ -45,12 +45,13 @@ async function doAutoFix() {
   store.setState({ phase: 'FIXING' })
 
   if (fitTrack.gaps.length === 0) {
-    store.setState({ phase: 'FIXED', fixes: [] })
+    store.setState({ phase: 'FIXED', fixes: [], fixedPoints: fitTrack.points })
     return
   }
 
   const fixes = matchAllGaps(fitTrack, gpxTrack)
-  store.setState({ phase: 'FIXED', fixes })
+  const fixedPoints = buildFixedTrack(fitTrack, fixes)
+  store.setState({ phase: 'FIXED', fixes, fixedPoints })
 
   const failCount = fixes.filter(f => f.status === 'failed').length
   if (failCount > 0) {
@@ -64,10 +65,9 @@ initTopbar()
 initSidebar({ onFitFile: handleFitFile, onGpxFile: handleGpxFile, onAutoFix: doAutoFix })
 initPanel({
   onDownload: () => {
-    const { fitTrack, fixes } = store.state
-    if (!fitTrack) { showToast('No track loaded'); return }
+    const { fitTrack, fixedPoints } = store.state
+    if (!fitTrack || !fixedPoints) { showToast('No fixed track to export — click Fix using GPX first'); return }
     try {
-      const fixedPoints = buildFixedTrack(fitTrack, fixes)
       const fitBuffer = writeFit(fixedPoints, fitTrack.activityType)
       downloadFit(fitBuffer, `fixed-ride-${Date.now()}.fit`)
       store.setState({ phase: 'EXPORTED' })
@@ -80,8 +80,18 @@ initPanel({
 
 let _lastFit = null
 let _lastGpx = null
+let _lastFixedPoints = null
 store.subscribe(state => {
-  if (state.phase === 'IDLE') { clearAll(map); _lastFit = null; _lastGpx = null; return }
+  if (state.phase === 'IDLE') { clearAll(map); _lastFit = null; _lastGpx = null; _lastFixedPoints = null; return }
+
+  if (state.phase === 'FIXED' || state.phase === 'EXPORTED') {
+    if (state.fixedPoints !== _lastFixedPoints) {
+      _lastFixedPoints = state.fixedPoints
+      renderFixedTrack(map, state.fixedPoints, state.fitTrack, state.fixes)
+    }
+    return
+  }
+
   if (state.fitTrack && state.fitTrack !== _lastFit) {
     _lastFit = state.fitTrack
     renderFitTrack(map, state.fitTrack)
@@ -89,8 +99,5 @@ store.subscribe(state => {
   if (state.gpxTrack && state.gpxTrack !== _lastGpx) {
     _lastGpx = state.gpxTrack
     renderGpxTrack(map, state.gpxTrack)
-  }
-  if (state.phase === 'FIXED' || state.phase === 'EXPORTED') {
-    renderFixes(map, state.fitTrack, state.fixes)
   }
 })
