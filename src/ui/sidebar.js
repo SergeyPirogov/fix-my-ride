@@ -33,38 +33,51 @@ function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
     const fit = state.fitTrack
     el.innerHTML = `
       <div class="upload-page">
-        <div class="upload-page-title">Fix broken GPS with a reference route</div>
-        <div class="upload-page-sub">Upload your broken activity, then a reference route to fix it against</div>
+        <div class="upload-hero-icon">📍</div>
+        <div class="upload-page-title">Fix broken GPS<br>with a reference route</div>
+        <div class="upload-page-sub">Upload your broken activity, then a clean route to fix it against</div>
 
-        <div class="dual-upload-step ${fit ? 'step-complete' : 'step-active'}">
-          <div class="dual-upload-num">${fit ? '✓' : '1'}</div>
-          <div class="dual-upload-body">
-            <div class="dual-upload-title">Broken .fit file</div>
-            ${fit ? `
-              <div class="dual-upload-done">${fit.points.length} points · ${(((fit.points[fit.points.length-1]?.distance ?? 0))/1000).toFixed(1)} km</div>
-            ` : `
-              <div class="upload-zone" id="upload-zone-fit">
-                <div class="upload-icon">📂</div>
-                <div class="upload-text">Drop <strong>.fit</strong> here or click to browse</div>
-                <input type="file" id="file-input-fit" accept=".fit" style="display:none" />
-              </div>
-            `}
+        <div class="dual-upload-track">
+          <div class="dual-upload-step ${fit ? 'step-complete' : 'step-active'}">
+            <div class="dual-upload-rail">
+              <div class="dual-upload-num">${fit ? '✓' : '1'}</div>
+              <div class="dual-upload-line ${fit ? 'line-complete' : ''}"></div>
+            </div>
+            <div class="dual-upload-body">
+              <div class="dual-upload-title">Broken .fit file</div>
+              ${fit ? `
+                <div class="dual-upload-done">
+                  <span class="dual-upload-done-icon">✓</span>
+                  ${fit.points.length.toLocaleString()} points · ${(((fit.points[fit.points.length-1]?.distance ?? 0))/1000).toFixed(1)} km
+                </div>
+              ` : `
+                <div class="upload-zone" id="upload-zone-fit">
+                  <div class="upload-icon">🚴</div>
+                  <div class="upload-cta">Drop <strong>.fit</strong> here or <span class="upload-link">browse</span></div>
+                  <div class="upload-formats">Your recorded activity, gaps and all</div>
+                  <input type="file" id="file-input-fit" accept=".fit" style="display:none" />
+                </div>
+              `}
+            </div>
           </div>
-        </div>
 
-        <div class="dual-upload-step ${!fit ? 'step-disabled' : 'step-active'}">
-          <div class="dual-upload-num">2</div>
-          <div class="dual-upload-body">
-            <div class="dual-upload-title">Reference .gpx route</div>
-            ${fit ? `
-              <div class="upload-zone" id="upload-zone-gpx">
-                <div class="upload-icon">📂</div>
-                <div class="upload-text">Drop <strong>.gpx</strong> here or click to browse</div>
-                <input type="file" id="file-input-gpx" accept=".gpx" style="display:none" />
-              </div>
-            ` : `
-              <div class="upload-hint-disabled">Upload the broken .fit file first</div>
-            `}
+          <div class="dual-upload-step ${!fit ? 'step-disabled' : 'step-active'}">
+            <div class="dual-upload-rail">
+              <div class="dual-upload-num">2</div>
+            </div>
+            <div class="dual-upload-body">
+              <div class="dual-upload-title">Reference .gpx route</div>
+              ${fit ? `
+                <div class="upload-zone" id="upload-zone-gpx">
+                  <div class="upload-icon">🗺️</div>
+                  <div class="upload-cta">Drop <strong>.gpx</strong> here or <span class="upload-link">browse</span></div>
+                  <div class="upload-formats">A clean route covering the same path</div>
+                  <input type="file" id="file-input-gpx" accept=".gpx" style="display:none" />
+                </div>
+              ` : `
+                <div class="upload-hint-disabled">Upload the broken .fit file first</div>
+              `}
+            </div>
           </div>
         </div>
       </div>
