@@ -148,10 +148,27 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
     if (_unsubscribe) { _unsubscribe(); _unsubscribe = null }
   }
 
+  // Remove the most recently placed handle — E first, then S.
+  function undo() {
+    if (endMarker) {
+      map.removeLayer(endMarker); endMarker = null; endPt = null
+      const endInput = document.getElementById('coord-end')
+      if (endInput) endInput.value = ''
+      store.setState({ segmentEnd: null, segmentEndPt: null })
+      setHint(`Now click to set the <span class="hint-key">end</span> of the broken segment`)
+    } else if (startMarker) {
+      map.removeLayer(startMarker); startMarker = null; startPt = null
+      const startInput = document.getElementById('coord-start')
+      if (startInput) startInput.value = ''
+      store.setState({ segmentStart: null, segmentStartPt: null })
+      setHint(`Click on the map to set the <span class="hint-key">start</span> of the broken segment`)
+    }
+  }
+
   _unsubscribe = store.subscribe(state => {
     if (state.phase === 'LOADED') activate()
     if (state.phase === 'IDLE') deactivate()
   })
 
-  return { deactivate }
+  return { deactivate, undo }
 }

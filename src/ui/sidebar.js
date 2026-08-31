@@ -3,20 +3,20 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-export function initSidebar({ onFile, onFindRoute }) {
+export function initSidebar({ onFile, onFindRoute, onUndo }) {
   const el = document.getElementById('sidebar')
   el.className = 'sidebar'
 
   // Initial render
-  renderSidebar(el, onFile, onFindRoute, store.state)
+  renderSidebar(el, onFile, onFindRoute, onUndo, store.state)
 
   if (_unsubscribe) _unsubscribe()
   _unsubscribe = store.subscribe(state => {
-    renderSidebar(el, onFile, onFindRoute, state)
+    renderSidebar(el, onFile, onFindRoute, onUndo, state)
   })
 }
 
-function renderSidebar(el, onFile, onFindRoute, state) {
+function renderSidebar(el, onFile, onFindRoute, onUndo, state) {
   if (state.phase === 'IDLE') {
     el.innerHTML = `
       <div class="upload-page">
@@ -76,7 +76,10 @@ function renderSidebar(el, onFile, onFindRoute, state) {
           <input class="coord-input" id="coord-end" type="text" placeholder="48.2200, 16.3850" value="${state.segmentEndPt ? `${fmt(state.segmentEndPt.lat)}, ${fmt(state.segmentEndPt.lng)}` : ''}" />
           <div class="coord-hint" id="coord-end-hint">${state.segmentEnd !== null ? `Nearest track point: ${state.segmentEnd}` : 'Or click on map'}</div>
         </div>
-        <button class="btn btn-primary" id="btn-find-route" style="width:100%;margin-top:10px" ${!state.segmentStartPt || !state.segmentEndPt ? 'disabled' : ''}>Find Route →</button>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-ghost" id="btn-undo-click" ${!state.segmentStartPt ? 'disabled' : ''}>↺ Undo</button>
+          <button class="btn btn-primary" id="btn-find-route" style="flex:1" ${!state.segmentStartPt || !state.segmentEndPt ? 'disabled' : ''}>Find Route →</button>
+        </div>
         ${t.gaps.length === 0 ? '<div class="no-gaps-msg" style="margin-top:8px">No gaps detected — track looks clean</div>' : ''}
       </div>
     `
@@ -123,6 +126,7 @@ function renderSidebar(el, onFile, onFindRoute, state) {
         onFindRoute(segmentStart, segmentEnd, segmentStartPt, segmentEndPt)
       }
     })
+    el.querySelector('#btn-undo-click')?.addEventListener('click', () => onUndo?.())
     return
   }
 

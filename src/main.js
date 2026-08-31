@@ -68,7 +68,12 @@ async function doFindRoute(startIdx, endIdx, startPt, endPt) {
   }
 }
 
-initSidebar({ onFile: handleFile, onFindRoute: doFindRoute })
+const selection = initSelection(map, {
+  onSegmentChange: (startIdx, endIdx, startPt, endPt) => doFindRoute(startIdx, endIdx, startPt, endPt),
+  onDrawModeToggle: () => {}
+})
+
+initSidebar({ onFile: handleFile, onFindRoute: doFindRoute, onUndo: selection.undo })
 
 const drawMode = initDrawMode(map, {
   onRouteComplete: (coords) => {
@@ -107,11 +112,6 @@ initPanel({
       console.error(e)
     }
   }
-})
-
-initSelection(map, {
-  onSegmentChange: (startIdx, endIdx, startPt, endPt) => doFindRoute(startIdx, endIdx, startPt, endPt),
-  onDrawModeToggle: () => {}
 })
 
 let _lastTrack = null
