@@ -2,7 +2,7 @@
 
 Fix broken GPS in a cycling/running activity by replacing its route with a clean reference track — right in the browser, no backend, no upload to a server.
 
-**Live app:** https://automation-remarks.com/
+**Live app:** https://automation-remarks.com/fix-my-ride/
 
 ## Why
 
