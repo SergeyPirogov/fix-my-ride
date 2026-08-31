@@ -84,7 +84,6 @@ export function writeFit(points, activityType) {
   // FIT protocol: header (14 bytes) + record messages + CRC (2 bytes)
   // We write: file_id message, session message, lap message, N record messages
 
-  const SPORT = activityType === 'running' ? 1 : 2
   const buf = new ArrayBuffer(16 * 1024 * 1024) // 16MB max
   const view = new DataView(buf)
   let offset = 14 // skip header, fill after
