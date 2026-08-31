@@ -27,8 +27,8 @@ function makeHandle(map, latlng, color, label) {
 export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
   let startMarker = null
   let endMarker = null
-  let startIdx = null
-  let endIdx = null
+  let startPt = null   // { lat, lng } exact
+  let endPt = null     // { lat, lng } exact
   let hint = null
   let debounceTimer = null
   let _unsubscribe = null
@@ -39,17 +39,25 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
   }
 
   function notify() {
-    if (startIdx !== null && endIdx !== null) {
-      const [s, e] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
-      store.setState({ segmentStart: s, segmentEnd: e })
+    if (startPt !== null && endPt !== null) {
       const track = store.state.track
-      updateCoordInput('coord-start', track.points[s])
-      updateCoordInput('coord-end', track.points[e])
-      const dist = Math.abs((track?.points[e]?.distance ?? 0) - (track?.points[s]?.distance ?? 0))
+      const sIdx = nearestPointIndex(track, startPt)
+      const eIdx = nearestPointIndex(track, endPt)
+      const [spliceStart, spliceEnd] = sIdx < eIdx ? [sIdx, eIdx] : [eIdx, sIdx]
+      store.setState({
+        segmentStart: spliceStart,
+        segmentEnd: spliceEnd,
+        segmentStartPt: startPt,
+        segmentEndPt: endPt,
+      })
+      const dist = Math.hypot(
+        (endPt.lat - startPt.lat) * 111320,
+        (endPt.lng - startPt.lng) * 111320 * Math.cos(startPt.lat * Math.PI / 180)
+      )
       if (dist < 50) {
         import('../ui/panel.js').then(m => m.showToast('Gap under 50m — may not need fixing', 'warning'))
       }
-      onSegmentChange(s, e)
+      onSegmentChange(spliceStart, spliceEnd, startPt, endPt)
     }
   }
 
@@ -60,7 +68,7 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
 
   function activate() {
     map.off('click', onMapClick)
-    startMarker = null; endMarker = null; startIdx = null; endIdx = null
+    startMarker = null; endMarker = null; startPt = null; endPt = null
 
     if (!hint) {
       hint = document.createElement('div')
@@ -69,27 +77,27 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
     }
 
     const track = store.state.track
-    const { segmentStart, segmentEnd } = store.state
-    if (track && segmentStart !== null && segmentEnd !== null) {
-      startIdx = segmentStart
-      endIdx = segmentEnd
-      startMarker = makeHandle(map, [track.points[startIdx].lat, track.points[startIdx].lng], '#2563EB', 'S')
+    const { segmentStartPt, segmentEndPt } = store.state
+    if (track && segmentStartPt && segmentEndPt) {
+      startPt = segmentStartPt
+      endPt = segmentEndPt
+      startMarker = makeHandle(map, [startPt.lat, startPt.lng], '#2563EB', 'S')
       startMarker.on('drag', ev => {
-        startIdx = nearestPointIndex(track, ev.latlng)
-        updateCoordInput('coord-start', track.points[startIdx])
+        startPt = { lat: ev.target.getLatLng().lat, lng: ev.target.getLatLng().lng }
+        updateCoordInput('coord-start', startPt)
         clearTimeout(debounceTimer)
         debounceTimer = setTimeout(notify, DEBOUNCE_MS)
       })
-      endMarker = makeHandle(map, [track.points[endIdx].lat, track.points[endIdx].lng], '#EF4444', 'E')
+      endMarker = makeHandle(map, [endPt.lat, endPt.lng], '#EF4444', 'E')
       endMarker.on('drag', ev => {
-        endIdx = nearestPointIndex(track, ev.latlng)
-        updateCoordInput('coord-end', track.points[endIdx])
+        endPt = { lat: ev.target.getLatLng().lat, lng: ev.target.getLatLng().lng }
+        updateCoordInput('coord-end', endPt)
         clearTimeout(debounceTimer)
         debounceTimer = setTimeout(notify, DEBOUNCE_MS)
       })
       setHint(`Drag handles to adjust, or click Find Route`)
     } else {
-      setHint(`Click on the track to set the <span class="hint-key">start</span> of the broken segment`)
+      setHint(`Click on the map to set the <span class="hint-key">start</span> of the broken segment`)
     }
 
     map.on('click', onMapClick)
@@ -102,31 +110,31 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
     const phase = store.state.phase
     if (phase !== 'SELECTING' && phase !== 'LOADED') return
 
-    const idx = nearestPointIndex(track, e.latlng)
-    const pt = track.points[idx]
-    const latlng = [pt.lat, pt.lng]
+    const clicked = { lat: e.latlng.lat, lng: e.latlng.lng }
+    const latlng = [clicked.lat, clicked.lng]
 
     if (!startMarker) {
-      startIdx = idx
+      startPt = clicked
       startMarker = makeHandle(map, latlng, '#2563EB', 'S')
       startMarker.on('drag', ev => {
-        startIdx = nearestPointIndex(track, ev.latlng)
-        updateCoordInput('coord-start', track.points[startIdx])
+        startPt = { lat: ev.target.getLatLng().lat, lng: ev.target.getLatLng().lng }
+        updateCoordInput('coord-start', startPt)
         clearTimeout(debounceTimer)
         debounceTimer = setTimeout(notify, DEBOUNCE_MS)
       })
-      store.setState({ segmentStart: idx })
-      updateCoordInput('coord-start', pt)
+      updateCoordInput('coord-start', clicked)
       setHint(`Now click to set the <span class="hint-key">end</span> of the broken segment`)
     } else {
-      endIdx = idx
+      endPt = clicked
       if (endMarker) map.removeLayer(endMarker)
       endMarker = makeHandle(map, latlng, '#EF4444', 'E')
       endMarker.on('drag', ev => {
-        endIdx = nearestPointIndex(track, ev.latlng)
+        endPt = { lat: ev.target.getLatLng().lat, lng: ev.target.getLatLng().lng }
+        updateCoordInput('coord-end', endPt)
         clearTimeout(debounceTimer)
         debounceTimer = setTimeout(notify, DEBOUNCE_MS)
       })
+      updateCoordInput('coord-end', clicked)
       notify()
     }
   }
@@ -136,7 +144,7 @@ export function initSelection(map, { onSegmentChange, onDrawModeToggle }) {
     if (startMarker) { map.removeLayer(startMarker); startMarker = null }
     if (endMarker) { map.removeLayer(endMarker); endMarker = null }
     if (hint) { hint.remove(); hint = null }
-    startIdx = null; endIdx = null
+    startPt = null; endPt = null
     if (_unsubscribe) { _unsubscribe(); _unsubscribe = null }
   }
 

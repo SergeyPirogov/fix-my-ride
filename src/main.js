@@ -31,6 +31,8 @@ async function handleFile(file) {
     recordRecentActivity(track, file.name)
     // Pre-select first detected gap if any
     const firstGap = track.gaps[0]
+    const startPt = firstGap ? { lat: track.points[firstGap.startIdx].lat, lng: track.points[firstGap.startIdx].lng } : null
+    const endPt = firstGap ? { lat: track.points[firstGap.endIdx].lat, lng: track.points[firstGap.endIdx].lng } : null
     store.setState({
       phase: 'LOADED',
       track,
@@ -38,6 +40,8 @@ async function handleFile(file) {
       chosenRoute: null,
       segmentStart: firstGap?.startIdx ?? null,
       segmentEnd: firstGap?.endIdx ?? null,
+      segmentStartPt: startPt,
+      segmentEndPt: endPt,
     })
   } catch (e) {
     showToast(e.message || 'Failed to parse file')
@@ -50,11 +54,11 @@ initTopbar()
 
 let suggestionLayer = null
 
-async function doFindRoute(startIdx, endIdx) {
-  store.setState({ phase: 'FIXING', segmentStart: startIdx, segmentEnd: endIdx })
+async function doFindRoute(startIdx, endIdx, startPt, endPt) {
+  store.setState({ phase: 'FIXING', segmentStart: startIdx, segmentEnd: endIdx, segmentStartPt: startPt, segmentEndPt: endPt })
   if (suggestionLayer) { removeSuggestionLayer(map, suggestionLayer); suggestionLayer = null }
   try {
-    const suggestions = await fetchSuggestions(store.state.track, startIdx, endIdx)
+    const suggestions = await fetchSuggestions(store.state.track, startIdx, endIdx, startPt, endPt)
     const chosenRoute = suggestions[0]?.route ?? null
     if (chosenRoute) suggestionLayer = addSuggestionLayer(map, chosenRoute)
     store.setState({ phase: 'FIXED', suggestions, chosenRoute })
@@ -106,7 +110,7 @@ initPanel({
 })
 
 initSelection(map, {
-  onSegmentChange: (startIdx, endIdx) => doFindRoute(startIdx, endIdx),
+  onSegmentChange: (startIdx, endIdx, startPt, endPt) => doFindRoute(startIdx, endIdx, startPt, endPt),
   onDrawModeToggle: () => {}
 })
 

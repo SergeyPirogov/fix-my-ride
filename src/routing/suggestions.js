@@ -1,10 +1,10 @@
 // src/routing/suggestions.js
 import { fetchOsrmRoutes, scoreRoute } from './osrm.js'
 
-export async function fetchSuggestions(track, startIdx, endIdx) {
-  const startPoint = track.points[startIdx]
-  const endPoint = track.points[endIdx]
-  const gapDist = endPoint.distance - startPoint.distance
+export async function fetchSuggestions(track, startIdx, endIdx, startPt, endPt) {
+  const startPoint = startPt ?? track.points[startIdx]
+  const endPoint = endPt ?? track.points[endIdx]
+  const gapDist = Math.abs((track.points[endIdx]?.distance ?? 0) - (track.points[startIdx]?.distance ?? 0))
 
   let routes
   try {

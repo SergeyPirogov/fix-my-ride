@@ -68,20 +68,21 @@ function renderSidebar(el, onFile, onFindRoute, state) {
         ` : ''}
         <div class="coord-field">
           <label class="coord-label">Start point</label>
-          <input class="coord-input" id="coord-start" type="text" placeholder="48.2100, 16.3700" value="${state.segmentStart !== null ? `${fmt(t.points[state.segmentStart].lat)}, ${fmt(t.points[state.segmentStart].lng)}` : ''}" />
-          <div class="coord-hint" id="coord-start-hint">${state.segmentStart !== null ? `Snapped to point ${state.segmentStart}` : 'Or click on map'}</div>
+          <input class="coord-input" id="coord-start" type="text" placeholder="48.2100, 16.3700" value="${state.segmentStartPt ? `${fmt(state.segmentStartPt.lat)}, ${fmt(state.segmentStartPt.lng)}` : ''}" />
+          <div class="coord-hint" id="coord-start-hint">${state.segmentStart !== null ? `Nearest track point: ${state.segmentStart}` : 'Or click on map'}</div>
         </div>
         <div class="coord-field">
           <label class="coord-label">End point</label>
-          <input class="coord-input" id="coord-end" type="text" placeholder="48.2200, 16.3850" value="${state.segmentEnd !== null ? `${fmt(t.points[state.segmentEnd].lat)}, ${fmt(t.points[state.segmentEnd].lng)}` : ''}" />
-          <div class="coord-hint" id="coord-end-hint">${state.segmentEnd !== null ? `Snapped to point ${state.segmentEnd}` : 'Or click on map'}</div>
+          <input class="coord-input" id="coord-end" type="text" placeholder="48.2200, 16.3850" value="${state.segmentEndPt ? `${fmt(state.segmentEndPt.lat)}, ${fmt(state.segmentEndPt.lng)}` : ''}" />
+          <div class="coord-hint" id="coord-end-hint">${state.segmentEnd !== null ? `Nearest track point: ${state.segmentEnd}` : 'Or click on map'}</div>
         </div>
-        <button class="btn btn-primary" id="btn-find-route" style="width:100%;margin-top:10px" ${state.segmentStart === null || state.segmentEnd === null ? 'disabled' : ''}>Find Route →</button>
+        <button class="btn btn-primary" id="btn-find-route" style="width:100%;margin-top:10px" ${!state.segmentStartPt || !state.segmentEndPt ? 'disabled' : ''}>Find Route →</button>
         ${t.gaps.length === 0 ? '<div class="no-gaps-msg" style="margin-top:8px">No gaps detected — track looks clean</div>' : ''}
       </div>
     `
 
-    // Wire coord inputs — parse lat,lng and snap to nearest track point
+    // Wire coord inputs — exact typed lat/lng is used as-is (no snapping);
+    // the nearest track point is only found to know where to splice the fix.
     function parseCoord(str) {
       const m = str.match(/(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/)
       if (!m) return null
@@ -97,29 +98,29 @@ function renderSidebar(el, onFile, onFindRoute, state) {
     }
     function updateBtn() {
       const btn = el.querySelector('#btn-find-route')
-      if (btn) btn.disabled = store.state.segmentStart === null || store.state.segmentEnd === null
+      if (btn) btn.disabled = store.state.segmentStartPt === null || store.state.segmentEndPt === null
     }
 
     el.querySelector('#coord-start')?.addEventListener('input', e => {
       const c = parseCoord(e.target.value)
-      if (!c) { el.querySelector('#coord-start-hint').textContent = 'Invalid — use: lat, lng'; return }
+      if (!c) { el.querySelector('#coord-start-hint').textContent = 'Invalid — use: lat, lng'; store.setState({ segmentStartPt: null }); updateBtn(); return }
       const idx = nearestIdx(c.lat, c.lng)
-      el.querySelector('#coord-start-hint').textContent = `Snapped to point ${idx}`
-      store.setState({ segmentStart: idx })
+      el.querySelector('#coord-start-hint').textContent = `Nearest track point: ${idx}`
+      store.setState({ segmentStart: idx, segmentStartPt: c })
       updateBtn()
     })
     el.querySelector('#coord-end')?.addEventListener('input', e => {
       const c = parseCoord(e.target.value)
-      if (!c) { el.querySelector('#coord-end-hint').textContent = 'Invalid — use: lat, lng'; return }
+      if (!c) { el.querySelector('#coord-end-hint').textContent = 'Invalid — use: lat, lng'; store.setState({ segmentEndPt: null }); updateBtn(); return }
       const idx = nearestIdx(c.lat, c.lng)
-      el.querySelector('#coord-end-hint').textContent = `Snapped to point ${idx}`
-      store.setState({ segmentEnd: idx })
+      el.querySelector('#coord-end-hint').textContent = `Nearest track point: ${idx}`
+      store.setState({ segmentEnd: idx, segmentEndPt: c })
       updateBtn()
     })
     el.querySelector('#btn-find-route')?.addEventListener('click', () => {
-      const { segmentStart, segmentEnd } = store.state
-      if (segmentStart !== null && segmentEnd !== null) {
-        onFindRoute(segmentStart, segmentEnd)
+      const { segmentStart, segmentEnd, segmentStartPt, segmentEndPt } = store.state
+      if (segmentStartPt && segmentEndPt) {
+        onFindRoute(segmentStart, segmentEnd, segmentStartPt, segmentEndPt)
       }
     })
     return
@@ -156,7 +157,7 @@ function renderSidebar(el, onFile, onFindRoute, state) {
       </div>
     `
     document.getElementById('btn-reselect')?.addEventListener('click', () => {
-      store.setState({ phase: 'LOADED', segmentStart: null, segmentEnd: null, suggestions: [], chosenRoute: null })
+      store.setState({ phase: 'LOADED', segmentStart: null, segmentEnd: null, segmentStartPt: null, segmentEndPt: null, suggestions: [], chosenRoute: null })
     })
     return
   }

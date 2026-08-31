@@ -42,14 +42,12 @@ export function initDrawMode(map, { onRouteComplete }) {
 
   function finish() {
     if (waypoints.length < 1) return
-    const { track, segmentStart, segmentEnd } = store.state
-    if (!track || segmentStart === null || segmentEnd === null) return
-    const start = track.points[segmentStart]
-    const end = track.points[segmentEnd]
+    const { track, segmentStartPt, segmentEndPt } = store.state
+    if (!track || !segmentStartPt || !segmentEndPt) return
     const full = [
-      [start.lng, start.lat],
+      [segmentStartPt.lng, segmentStartPt.lat],
       ...waypoints,
-      [end.lng, end.lat],
+      [segmentEndPt.lng, segmentEndPt.lat],
     ]
     deactivate()
     onRouteComplete(full)

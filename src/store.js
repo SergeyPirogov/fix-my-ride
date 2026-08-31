@@ -2,8 +2,10 @@
 const INITIAL_STATE = {
   phase: 'IDLE',        // IDLE | LOADED | SELECTING | FIXING | FIXED | EXPORTED
   track: null,
-  segmentStart: null,   // point index
-  segmentEnd: null,     // point index
+  segmentStart: null,   // point index (splice position — nearest point, not display coords)
+  segmentEnd: null,     // point index (splice position)
+  segmentStartPt: null, // { lat, lng } — exact coordinate the user set (click or typed)
+  segmentEndPt: null,   // { lat, lng } — exact coordinate the user set
   suggestions: [],      // [{ route, distance, matchScore, label }]
   chosenRoute: null,
 }
