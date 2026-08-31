@@ -107,8 +107,14 @@ export function writeFit(points, activityType) {
   function writeI32(v) { view.setInt32(offset, v, true); offset += 4 }
 
   const FIT_EPOCH = 631065600 // seconds between Unix epoch and FIT epoch (1989-12-31)
-  const startTs = Math.round((points[0]?.timestamp ?? Date.now()) / 1000) - FIT_EPOCH
-  const endTs = Math.round((points[points.length - 1]?.timestamp ?? Date.now()) / 1000) - FIT_EPOCH
+  // Strava dedupes uploads primarily by activity start_time, not file_id —
+  // a fixed export that keeps the ride's exact original start time reads as
+  // "this activity already exists" even with a fresh file_id. Shifting every
+  // timestamp by a few seconds keeps duration/pacing intact while producing
+  // a start_time Strava hasn't seen before.
+  const TIME_SHIFT_SECONDS = 5
+  const startTs = Math.round((points[0]?.timestamp ?? Date.now()) / 1000) - FIT_EPOCH + TIME_SHIFT_SECONDS
+  const endTs = Math.round((points[points.length - 1]?.timestamp ?? Date.now()) / 1000) - FIT_EPOCH + TIME_SHIFT_SECONDS
   const totalElapsed = Math.max(0, endTs - startTs)
   const totalDistance = points[points.length - 1]?.distance ?? 0
   const SPORT = activityType === 'running' ? 1 : 2 // FIT sport enum: 1=running, 2=cycling
@@ -182,7 +188,7 @@ export function writeFit(points, activityType) {
   // Write record messages
   points.forEach(pt => {
     writeU8(0x00) // data header local msg 0
-    writeU32(Math.round(pt.timestamp / 1000) - FIT_EPOCH)
+    writeU32(Math.round(pt.timestamp / 1000) - FIT_EPOCH + TIME_SHIFT_SECONDS)
     writeI32(Math.round(pt.lat * (2 ** 31 / 180)))
     writeI32(Math.round(pt.lng * (2 ** 31 / 180)))
     writeU16(Math.round(pt.ele * 5 + 500))
