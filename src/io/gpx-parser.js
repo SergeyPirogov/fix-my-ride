@@ -22,7 +22,7 @@ export function parseGpx(xmlString) {
     const lng = parseFloat(pt.getAttribute('lon'))
     const ele = parseFloat(pt.querySelector('ele')?.textContent ?? '0')
     const timeStr = pt.querySelector('time')?.textContent
-    const timestamp = timeStr ? Math.floor(new Date(timeStr).getTime() / 1000) : i
+    const timestamp = timeStr ? new Date(timeStr).getTime() : i * 1000
     const hr = pt.querySelector('hr') ? parseInt(pt.querySelector('hr').textContent) : null
     const power = pt.querySelector('power') ? parseInt(pt.querySelector('power').textContent) : null
     const cadence = pt.querySelector('cadence') ? parseInt(pt.querySelector('cadence').textContent) : null

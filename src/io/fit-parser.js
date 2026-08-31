@@ -3,7 +3,7 @@ import FitParser from 'fit-file-parser'
 
 const SPORT_MAP = { cycling: 'cycling', running: 'running', 0: 'cycling', 1: 'running' }
 const GAP_DISTANCE_THRESHOLD = 200  // metres
-const GAP_TIME_THRESHOLD = 5 * 60  // seconds
+const GAP_TIME_THRESHOLD = 5 * 60 * 1000  // milliseconds
 
 export function detectGaps(points) {
   const gaps = []
@@ -34,7 +34,7 @@ export function parseFit(arrayBuffer) {
           lat: r.position_lat,
           lng: r.position_long,
           ele: r.altitude ?? 0,
-          timestamp: r.timestamp instanceof Date ? Math.floor(r.timestamp.getTime() / 1000) : r.timestamp,
+          timestamp: r.timestamp instanceof Date ? r.timestamp.getTime() : r.timestamp * 1000,
           hr: r.heart_rate ?? null,
           power: r.power ?? null,
           cadence: r.cadence ?? null,
