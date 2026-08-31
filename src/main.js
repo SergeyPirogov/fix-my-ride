@@ -7,9 +7,9 @@ import { initPanel, showToast } from './ui/panel.js'
 import { parseFit } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
-import { renderTrack, clearTrack } from './map/track-layer.js'
+import { renderTrack, clearTrack, addSuggestionLayer, removeSuggestionLayer } from './map/track-layer.js'
 import { initSelection } from './map/selection.js'
-// TODO: import { fetchSuggestions } from './routing/suggestions.js'  // will be created in Task 7
+import { fetchSuggestions } from './routing/suggestions.js'
 
 async function handleFile(file) {
   const ext = file.name.split('.').pop().toLowerCase()
@@ -37,12 +37,28 @@ const map = initMap()
 
 initTopbar()
 initSidebar({ onFile: handleFile })
-initPanel({ onChoose: () => {}, onDownload: () => {} })
+let suggestionLayer = null
+
+initPanel({
+  onChoose: (suggestion) => {
+    if (suggestionLayer) removeSuggestionLayer(map, suggestionLayer)
+    suggestionLayer = addSuggestionLayer(map, suggestion.route)
+    store.setState({ chosenRoute: suggestion.route })
+  },
+  onDownload: () => {} // Task 8
+})
 
 initSelection(map, {
   onSegmentChange: async (startIdx, endIdx) => {
-    store.setState({ phase: 'SEGMENT_SELECTED', segmentStart: startIdx, segmentEnd: endIdx })
-    // Task 7 will wire fetchSuggestions here
+    store.setState({ phase: 'FIXING', segmentStart: startIdx, segmentEnd: endIdx })
+    try {
+      const suggestions = await fetchSuggestions(store.state.track, startIdx, endIdx)
+      const chosenRoute = suggestions[0]?.route ?? null
+      store.setState({ phase: 'ROUTE_CHOSEN', suggestions, chosenRoute })
+    } catch (e) {
+      showToast(e.message)
+      store.setState({ phase: 'LOADED', suggestions: [], chosenRoute: null })
+    }
   }
 })
 
