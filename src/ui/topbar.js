@@ -1,6 +1,8 @@
 // src/ui/topbar.js
 import { store } from '../store.js'
 
+let _unsubscribe = null
+
 const STEPS = ['Load', 'Select', 'Fix', 'Export']
 const PHASE_STEP = {
   IDLE: 0, LOADED: 1, SEGMENT_SELECTED: 1,
@@ -50,5 +52,6 @@ export function initTopbar() {
   }
 
   render(store.state)
-  store.subscribe(render)
+  if (_unsubscribe) _unsubscribe()
+  _unsubscribe = store.subscribe(render)
 }

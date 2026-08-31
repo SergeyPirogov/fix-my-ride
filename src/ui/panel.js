@@ -1,11 +1,14 @@
 // src/ui/panel.js
 import { store } from '../store.js'
 
+let _unsubscribe = null
+
 export function initPanel({ onChoose, onDownload }) {
   const el = document.getElementById('right-panel')
   el.className = 'right-panel'
 
-  store.subscribe(state => {
+  if (_unsubscribe) _unsubscribe()
+  _unsubscribe = store.subscribe(state => {
     if (state.phase === 'IDLE' || state.phase === 'LOADED') {
       el.innerHTML = ''
       return
@@ -67,7 +70,7 @@ export function initPanel({ onChoose, onDownload }) {
             <button class="btn btn-ghost" id="btn-back">← Back</button>
             <button class="btn btn-primary" id="btn-apply-fix" ${!state.chosenRoute ? 'disabled' : ''}>Apply Fix</button>
           </div>
-          <button class="btn btn-success" id="btn-download" ${state.phase !== 'EXPORTED' ? 'disabled style="opacity:0.5"' : ''}>Download .fit</button>
+          <button class="btn btn-success" id="btn-download" ${state.phase !== 'EXPORTED' ? 'disabled' : ''} style="${state.phase !== 'EXPORTED' ? 'opacity:0.5' : ''}">Download .fit</button>
         </div>
       `
 

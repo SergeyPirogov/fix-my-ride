@@ -1,6 +1,8 @@
 // src/ui/sidebar.js
 import { store } from '../store.js'
 
+let _unsubscribe = null
+
 export function initSidebar({ onFile }) {
   const el = document.getElementById('sidebar')
   el.className = 'sidebar'
@@ -32,7 +34,8 @@ export function initSidebar({ onFile }) {
     if (f) onFile(f)
   })
 
-  store.subscribe(state => {
+  if (_unsubscribe) _unsubscribe()
+  _unsubscribe = store.subscribe(state => {
     const list = document.getElementById('activity-list')
     if (!list) return
     const stored = JSON.parse(sessionStorage.getItem('recentActivities') || '[]')
@@ -57,6 +60,7 @@ export function recordRecentActivity(track, filename) {
   const totalDist = track.points[track.points.length - 1]?.distance ?? 0
   const ts = track.points[0]?.timestamp
   const date = ts ? new Date(ts).toLocaleDateString('en', { month: 'short', day: 'numeric' }) : ''
-  stored.unshift({ name: filename.replace(/\.(fit|gpx)$/i, ''), activityType: track.activityType, date, distance: totalDist, gaps: track.gaps.length })
+  const name = filename.replace(/\.(fit|gpx)$/i, '').replace(/[<>"'&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c]))
+  stored.unshift({ name, activityType: track.activityType, date, distance: totalDist, gaps: track.gaps.length })
   sessionStorage.setItem('recentActivities', JSON.stringify(stored.slice(0, 10)))
 }
