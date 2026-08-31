@@ -114,15 +114,21 @@ export function writeFit(points, activityType) {
   const SPORT = activityType === 'running' ? 1 : 2 // FIT sport enum: 1=running, 2=cycling
 
   // --- file_id (mesg_num=0), local msg 1 ---
-  // Fields: type(1,enum), manufacturer(2,uint16), time_created(4,uint32)
-  writeU8(0x41); writeU8(0x00); writeU8(0x00); writeU16(0); writeU8(3)
+  // Fields: type(1,enum), manufacturer(2,uint16), serial_number(3,uint32), time_created(4,uint32)
+  // serial_number + a fresh time_created (file creation time, not ride start
+  // time) keep this export from fingerprinting as a duplicate of the
+  // original upload — Strava dedupes on file_id, and a fixed file re-using
+  // the ride's own start timestamp as time_created collides with it.
+  writeU8(0x41); writeU8(0x00); writeU8(0x00); writeU16(0); writeU8(4)
   writeU8(0); writeU8(1); writeU8(0)      // type: enum
   writeU8(1); writeU8(2); writeU8(132)    // manufacturer: uint16
+  writeU8(3); writeU8(4); writeU8(134)    // serial_number: uint32
   writeU8(4); writeU8(4); writeU8(134)    // time_created: uint32
   writeU8(0x01) // data header local msg 1
-  writeU8(4)            // type: activity
-  writeU16(255)         // manufacturer: development
-  writeU32(startTs)     // time_created
+  writeU8(4)                                            // type: activity
+  writeU16(255)                                         // manufacturer: development
+  writeU32((Date.now() % 0x100000000) >>> 0)             // serial_number: unique per export
+  writeU32(Math.round(Date.now() / 1000) - FIT_EPOCH)    // time_created: now, not ride start
 
   // --- session (mesg_num=18), local msg 2 ---
   // Fields: timestamp(253,4), start_time(2,4), sport(5,1), total_elapsed_time(7,4), total_distance(9,4)
