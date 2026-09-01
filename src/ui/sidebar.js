@@ -67,6 +67,7 @@ function renderSidebar(el, handlers, state) {
                   <span class="dual-upload-done-icon">✓</span>
                   ${fit.points.length.toLocaleString()} points · ${(((fit.points[fit.points.length-1]?.distance ?? 0))/1000).toFixed(1)} km
                   <button class="dual-upload-change" id="btn-change-fit">Change</button>
+                  <button class="dual-upload-discard" id="btn-discard">Discard</button>
                 </div>
               ` : `
                 <div class="upload-zone" id="upload-zone-fit">
@@ -110,6 +111,7 @@ function renderSidebar(el, handlers, state) {
     el.querySelector('[data-action="strava-pick"][data-slot="activity"]')?.addEventListener('click', onPickStravaActivity)
     el.querySelector('[data-action="strava-pick"][data-slot="route"]')?.addEventListener('click', onPickStravaRoute)
     el.querySelector('#btn-change-fit')?.addEventListener('click', onChangeFit)
+    el.querySelector('#btn-discard')?.addEventListener('click', () => store.reset())
     return
   }
 
@@ -124,11 +126,13 @@ function renderSidebar(el, handlers, state) {
           Replaces the whole path with the GPX route, keeping your recorded time/HR/power/cadence
         </div>
         <button class="btn btn-primary" id="btn-auto-fix" style="width:100%;margin-top:12px">Fix using GPX →</button>
+        <button class="btn btn-ghost" id="btn-discard" style="width:100%;margin-top:8px">Discard</button>
       </div>
     `
     el.querySelector('#btn-auto-fix')?.addEventListener('click', () => onAutoFix())
     el.querySelector('#btn-change-fit')?.addEventListener('click', onChangeFit)
     el.querySelector('#btn-change-gpx')?.addEventListener('click', onChangeGpx)
+    el.querySelector('#btn-discard')?.addEventListener('click', () => store.reset())
     return
   }
 

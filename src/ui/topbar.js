@@ -39,14 +39,12 @@ export function initTopbar() {
       </div>
       <div class="topbar-actions">
         <button class="theme-toggle" id="theme-toggle">◐</button>
-        ${state.phase !== 'IDLE' ? '<button class="btn btn-ghost" id="btn-reset">Discard</button>' : ''}
       </div>
     `
     document.getElementById('theme-toggle')?.addEventListener('click', () => {
       const root = document.documentElement
       root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark')
     })
-    document.getElementById('btn-reset')?.addEventListener('click', () => store.reset())
   }
 
   render(store.state)
