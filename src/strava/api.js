@@ -58,6 +58,38 @@ export async function fetchRouteStreams(accessToken, routeId) {
   return streamsToPoints(data, { noTimestamp: true })
 }
 
+// Uploads a generated .fit file as a new Strava activity. Strava's /uploads
+// endpoint is async: it hands back an upload id immediately, then the file
+// gets processed in the background. We poll /uploads/{id} until it reports
+// an activity_id (done) or an error (failed) — Strava has no webhook option
+// for a browser-only app, so polling is the only way to know the outcome.
+export async function uploadActivity(accessToken, fitBuffer, filename) {
+  const form = new FormData()
+  form.append('file', new Blob([fitBuffer]), filename)
+  form.append('data_type', 'fit')
+
+  const res = await fetch(`${BASE}/uploads`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+  })
+  if (res.status === 401) throw new Error('Strava session expired — please log in again')
+  if (!res.ok) throw new Error(`Strava upload failed: ${res.status}`)
+
+  const { id } = await res.json()
+  return pollUploadStatus(accessToken, id)
+}
+
+async function pollUploadStatus(accessToken, uploadId, { attempts = 15, delayMs = 1500 } = {}) {
+  for (let i = 0; i < attempts; i++) {
+    await new Promise(r => setTimeout(r, delayMs))
+    const status = await stravaFetch(`/uploads/${uploadId}`, accessToken)
+    if (status.error) throw new Error(status.error)
+    if (status.activity_id) return { activityId: String(status.activity_id) }
+  }
+  throw new Error('Strava is still processing the upload — check your Strava feed in a bit')
+}
+
 function keyStreamsByType(streams) {
   if (!Array.isArray(streams)) return streams
   return streams.reduce((acc, s) => ({ ...acc, [s.type]: s }), {})

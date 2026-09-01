@@ -3,7 +3,7 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-export function initPanel({ onDownload }) {
+export function initPanel({ onDownload, onUploadToStrava }) {
   const el = document.getElementById('right-panel')
   el.classList.add('right-panel')
 
@@ -71,10 +71,19 @@ export function initPanel({ onDownload }) {
 
       <div class="panel-actions">
         <button class="btn btn-success" id="btn-download">Download .fit</button>
+        <button class="btn btn-strava" id="btn-upload-strava">Upload to Strava</button>
       </div>
     `
     document.getElementById('btn-download')?.addEventListener('click', () => onDownload())
+    const uploadBtn = document.getElementById('btn-upload-strava')
+    uploadBtn?.addEventListener('click', () => onUploadToStrava(uploadBtn))
   })
+}
+
+export function setUploadButtonState(btn, { busy = false, done = false } = {}) {
+  if (!btn) return
+  btn.disabled = busy || done
+  btn.textContent = done ? 'Uploaded ✓' : busy ? 'Uploading…' : 'Upload to Strava'
 }
 
 export function showToast(message, type = 'error') {

@@ -3,15 +3,15 @@ import './style.css'
 import { store } from './store.js'
 import { initTopbar } from './ui/topbar.js'
 import { initSidebar } from './ui/sidebar.js'
-import { initPanel, showToast } from './ui/panel.js'
+import { initPanel, showToast, setUploadButtonState } from './ui/panel.js'
 import { parseFit, detectGaps } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
 import { renderFitTrack, renderGpxTrack, renderFixedTrack, clearAll, clearGpxTrack, showScrubMarker, clearScrubMarker } from './map/track-layer.js'
 import { buildFixedTrackFromGpx, writeFit, downloadFit } from './io/fit-writer.js'
 import { initAnalysisPanel } from './ui/analysis-panel.js'
-import { redirectToStravaLogin, handleAuthRedirect, refreshAuthIfNeeded, getStoredAuth } from './strava/auth.js'
-import { fetchActivities, fetchRoutes, fetchActivityStreams, fetchRouteStreams } from './strava/api.js'
+import { redirectToStravaLogin, handleAuthRedirect, refreshAuthIfNeeded, getStoredAuth, hasUploadScope } from './strava/auth.js'
+import { fetchActivities, fetchRoutes, fetchActivityStreams, fetchRouteStreams, uploadActivity } from './strava/api.js'
 import { openStravaPicker, showStravaPickerLoading, closeStravaPicker } from './ui/strava-picker.js'
 import { initMobileTabs } from './ui/mobile-tabs.js'
 
@@ -66,6 +66,50 @@ async function doAutoFix() {
 
 function handleStravaLogin() {
   redirectToStravaLogin()
+}
+
+// Uploading needs the activity:write scope, which older Strava logins in
+// this browser may not have granted. Re-login redirects the whole page away,
+// which would otherwise drop the in-memory fix — so we stash the workflow
+// state here and restore + resume the upload once the redirect comes back.
+const RESUME_KEY = 'fixMyRidePendingUpload'
+
+function stashStateForRelogin() {
+  const { phase, fitTrack, gpxTrack, fixedPoints } = store.state
+  sessionStorage.setItem(RESUME_KEY, JSON.stringify({ phase, fitTrack, gpxTrack, fixedPoints }))
+}
+
+function popStashedState() {
+  const raw = sessionStorage.getItem(RESUME_KEY)
+  if (!raw) return null
+  sessionStorage.removeItem(RESUME_KEY)
+  try { return JSON.parse(raw) } catch { return null }
+}
+
+async function uploadFixedFitToStrava(btn) {
+  const { fitTrack, fixedPoints } = store.state
+  if (!fitTrack || !fixedPoints) { showToast('No fixed track to upload — click Fix using GPX first'); return }
+
+  let auth = await refreshAuthIfNeeded()
+  if (!auth) { showToast('Strava session expired — please connect again'); return }
+
+  if (!hasUploadScope(auth)) {
+    stashStateForRelogin()
+    showToast('Reconnecting to Strava to allow uploads…', 'success')
+    redirectToStravaLogin()
+    return
+  }
+
+  setUploadButtonState(btn, { busy: true })
+  try {
+    const fitBuffer = writeFit(fixedPoints, fitTrack.activityType)
+    const { activityId } = await uploadActivity(auth.access_token, fitBuffer, `fixed-ride-${Date.now()}.fit`)
+    setUploadButtonState(btn, { done: true })
+    showToast(`Uploaded to Strava (activity ${activityId})`, 'success')
+  } catch (e) {
+    setUploadButtonState(btn, {})
+    showToast(e.message || 'Upload to Strava failed')
+  }
 }
 
 function changeFit() {
@@ -169,6 +213,19 @@ initSidebar({
     if (fresh) {
       store.setState({ stravaAuth: fresh })
       showToast('Connected to Strava', 'success')
+
+      const stashed = popStashedState()
+      if (stashed?.fixedPoints) {
+        store.setState(stashed)
+        showToast('Resuming upload…', 'success')
+        // The upload button doesn't exist yet on this tick — initPanel's
+        // render (triggered by the setState above) creates it. Wait a beat
+        // so uploadFixedFitToStrava can find and update it.
+        setTimeout(() => {
+          const btn = document.getElementById('btn-upload-strava')
+          uploadFixedFitToStrava(btn)
+        }, 0)
+      }
     }
   } catch (e) {
     showToast(e.message)
@@ -190,7 +247,8 @@ initPanel({
       showToast('Export failed — check browser console')
       console.error(e)
     }
-  }
+  },
+  onUploadToStrava: uploadFixedFitToStrava,
 })
 
 let _lastFit = null

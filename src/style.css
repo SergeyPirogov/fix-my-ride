@@ -115,6 +115,9 @@ body {
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-success { background: var(--success); color: #fff; }
+.btn-strava { background: #FC4C02; color: #fff; }
+.btn-strava:hover:not(:disabled) { background: #e34400; }
+.btn-strava:disabled { opacity: 0.6; cursor: not-allowed; }
 /* Sidebar */
 .sidebar { width: 260px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
 .sidebar-section { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
