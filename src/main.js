@@ -14,6 +14,7 @@ import { redirectToStravaLogin, handleAuthRedirect, refreshAuthIfNeeded, getStor
 import { fetchActivities, fetchRoutes, fetchActivityStreams, fetchRouteStreams, uploadActivity } from './strava/api.js'
 import { openStravaPicker, showStravaPickerLoading, closeStravaPicker } from './ui/strava-picker.js'
 import { initMobileTabs } from './ui/mobile-tabs.js'
+import { trackEvent } from './analytics.js'
 
 // Changing just the fit (or gpx) slot after both were already set should
 // land back on BOTH_LOADED, not FIT_LOADED — otherwise the still-valid
@@ -58,6 +59,7 @@ async function doAutoFix() {
 
   const fixedPoints = buildFixedTrackFromGpx(fitTrack, gpxTrack)
   store.setState({ phase: 'FIXED', fixedPoints })
+  trackEvent('fix-completed')
   // On mobile, jump straight to the Results tab instead of leaving the
   // user on Controls wondering where the fix went — no-op on desktop,
   // where all three panels are already visible.
@@ -106,6 +108,7 @@ async function uploadFixedFitToStrava(btn) {
     const { activityId } = await uploadActivity(auth.access_token, fitBuffer, `fixed-ride-${Date.now()}.fit`)
     setUploadButtonState(btn, { done: true })
     showToast(`Uploaded to Strava (activity ${activityId})`, 'success')
+    trackEvent('strava-uploaded')
   } catch (e) {
     setUploadButtonState(btn, {})
     showToast(e.message || 'Upload to Strava failed')
@@ -213,6 +216,7 @@ initSidebar({
     if (fresh) {
       store.setState({ stravaAuth: fresh })
       showToast('Connected to Strava', 'success')
+      trackEvent('strava-connected')
 
       const stashed = popStashedState()
       if (stashed?.fixedPoints) {
@@ -243,6 +247,7 @@ initPanel({
       const fitBuffer = writeFit(fixedPoints, fitTrack.activityType)
       downloadFit(fitBuffer, `fixed-ride-${Date.now()}.fit`)
       store.setState({ phase: 'EXPORTED' })
+      trackEvent('fit-downloaded')
     } catch (e) {
       showToast('Export failed — check browser console')
       console.error(e)
