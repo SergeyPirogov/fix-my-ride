@@ -1,10 +1,18 @@
 // src/ui/mobile-tabs.js
-// Below the mobile breakpoint, #sidebar / #map-column / #right-panel are
-// shown one at a time via a tab bar instead of the desktop's 3-column
-// layout. Above the breakpoint the tab bar is hidden by CSS and all three
-// panels show simultaneously regardless of which "tab" is marked active.
+// Below the mobile breakpoint, #sidebar and the combined #map-column +
+// #right-panel are shown one group at a time via a tab bar instead of the
+// desktop's 3-column layout. Above the breakpoint the tab bar is hidden by
+// CSS and all three panels show simultaneously regardless of which "tab"
+// is marked active.
 
-const PANEL_IDS = ['sidebar', 'map-column', 'right-panel']
+// Which panels a given tab shows — "map-column" brings #right-panel along
+// with it so results appear stacked below the map instead of needing a
+// separate tab.
+const TAB_PANELS = {
+  sidebar: ['sidebar'],
+  'map-column': ['map-column', 'right-panel'],
+}
+const ALL_PANEL_IDS = ['sidebar', 'map-column', 'right-panel']
 
 export function initMobileTabs() {
   const bar = document.getElementById('mobile-tabs')
@@ -14,12 +22,13 @@ export function initMobileTabs() {
     bar.querySelectorAll('.mobile-tab').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tab === tabName)
     })
-    PANEL_IDS.forEach(id => {
-      document.getElementById(id)?.classList.toggle('mobile-panel-active', id === tabName)
+    const shownIds = TAB_PANELS[tabName] ?? [tabName]
+    ALL_PANEL_IDS.forEach(id => {
+      document.getElementById(id)?.classList.toggle('mobile-panel-active', shownIds.includes(id))
     })
     // The map needs a fresh size read whenever it becomes visible again —
-    // Leaflet can't measure a display:none container.
-    if (tabName === 'map-column') {
+    // Leaflet can't measure a container that was just display:none.
+    if (shownIds.includes('map-column')) {
       window.dispatchEvent(new CustomEvent('mobile-tab-map-shown'))
     }
   }

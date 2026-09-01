@@ -61,7 +61,7 @@ async function doAutoFix() {
   // On mobile, jump straight to the Results tab instead of leaving the
   // user on Controls wondering where the fix went — no-op on desktop,
   // where all three panels are already visible.
-  mobileTabs?.activate('right-panel')
+  mobileTabs?.activate('map-column')
 }
 
 function handleStravaLogin() {

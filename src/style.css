@@ -343,15 +343,21 @@ body {
 
   #mobile-tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 
-  #app-body { position: relative; }
+  #app-body { position: relative; flex-direction: column; overflow-y: auto; }
   #sidebar, #map-column, #right-panel { display: none; width: 100%; border: none; }
   #sidebar.mobile-panel-active, #map-column.mobile-panel-active, #right-panel.mobile-panel-active { display: flex; }
 
+  /* Map + Results are shown together as one scrollable group — the map
+     keeps a fixed viewport-relative height instead of flex:1 filling all
+     remaining space, so Results has room to appear right below it. */
+  #map-column.mobile-panel-active { flex: none; }
+  #map.leaflet-container { height: 60vh; min-height: 280px; }
+  #right-panel.mobile-panel-active { flex: none; }
+
   .sidebar { width: 100%; }
   .right-panel { width: 100%; }
-  #map { min-height: 0; }
 
-  #analysis-panel.analysis-panel-open { max-height: min(320px, 46vh); }
+  #analysis-panel.analysis-panel-open { max-height: min(280px, 40vh); }
 
   .strava-picker-modal { width: 92vw; }
 }
