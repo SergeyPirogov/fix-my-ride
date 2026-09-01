@@ -5,7 +5,7 @@ let _unsubscribe = null
 
 export function initPanel({ onDownload }) {
   const el = document.getElementById('right-panel')
-  el.className = 'right-panel'
+  el.classList.add('right-panel')
 
   if (_unsubscribe) _unsubscribe()
   _unsubscribe = store.subscribe(state => {

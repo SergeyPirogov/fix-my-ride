@@ -5,7 +5,7 @@ let _unsubscribe = null
 
 export function initSidebar({ onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx }) {
   const el = document.getElementById('sidebar')
-  el.className = 'sidebar'
+  el.classList.add('sidebar')
 
   const handlers = { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx }
   renderSidebar(el, handlers, store.state)

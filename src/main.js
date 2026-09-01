@@ -13,6 +13,7 @@ import { initAnalysisPanel } from './ui/analysis-panel.js'
 import { redirectToStravaLogin, handleAuthRedirect, refreshAuthIfNeeded, getStoredAuth } from './strava/auth.js'
 import { fetchActivities, fetchRoutes, fetchActivityStreams, fetchRouteStreams } from './strava/api.js'
 import { openStravaPicker, showStravaPickerLoading, closeStravaPicker } from './ui/strava-picker.js'
+import { initMobileTabs } from './ui/mobile-tabs.js'
 
 // Changing just the fit (or gpx) slot after both were already set should
 // land back on BOTH_LOADED, not FIT_LOADED — otherwise the still-valid
@@ -141,6 +142,8 @@ async function pickStravaRoute() {
 const map = initMap()
 
 initTopbar()
+initMobileTabs()
+window.addEventListener('mobile-tab-map-shown', () => map.invalidateSize())
 initSidebar({
   onFitFile: handleFitFile,
   onGpxFile: handleGpxFile,
