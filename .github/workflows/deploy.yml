@@ -25,8 +25,8 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          STRAVA_CLIENT_ID: ${{ vars.STRAVA_CLIENT_ID }}
-          STRAVA_TOKEN_URL: ${{ vars.STRAVA_TOKEN_URL }}
+          STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+          STRAVA_TOKEN_URL: ${{ secrets.STRAVA_TOKEN_URL }}
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
