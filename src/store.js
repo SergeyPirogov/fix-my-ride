@@ -4,6 +4,7 @@ const INITIAL_STATE = {
   fitTrack: null,       // parsed broken .fit track
   gpxTrack: null,       // parsed reference .gpx track
   fixedPoints: null,    // the actual corrected point array — same data written to the exported .fit
+  stravaAuth: null,     // { access_token, refresh_token, expires_at, athlete } | null
 }
 
 const _subscribers = new Set()
@@ -20,7 +21,9 @@ export const store = {
     return () => _subscribers.delete(fn)
   },
   reset() {
-    _state = { ...INITIAL_STATE }
+    // Strava login survives "Start over"/"Discard" — it's a browser-session
+    // credential, not part of the current fix workflow.
+    _state = { ...INITIAL_STATE, stravaAuth: _state.stravaAuth }
     _subscribers.forEach(fn => fn(_state))
   },
 }

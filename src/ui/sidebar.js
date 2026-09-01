@@ -3,15 +3,16 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-export function initSidebar({ onFitFile, onGpxFile, onAutoFix }) {
+export function initSidebar({ onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute }) {
   const el = document.getElementById('sidebar')
   el.className = 'sidebar'
 
-  renderSidebar(el, onFitFile, onGpxFile, onAutoFix, store.state)
+  const handlers = { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute }
+  renderSidebar(el, handlers, store.state)
 
   if (_unsubscribe) _unsubscribe()
   _unsubscribe = store.subscribe(state => {
-    renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state)
+    renderSidebar(el, handlers, state)
   })
 }
 
@@ -28,7 +29,20 @@ function trackSummary(track, label, colorClass) {
   `
 }
 
-function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
+function stravaConnectRow(state, slot, label) {
+  if (!state.stravaAuth) {
+    return `<button class="strava-connect-btn" data-action="strava-login" data-slot="${slot}">
+      <span class="strava-dot"></span>Connect Strava to pick ${label}
+    </button>`
+  }
+  return `<button class="strava-connect-btn strava-connect-btn-active" data-action="strava-pick" data-slot="${slot}">
+    <span class="strava-dot"></span>Choose ${label} from Strava
+  </button>`
+}
+
+function renderSidebar(el, handlers, state) {
+  const { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute } = handlers
+
   if (state.phase === 'IDLE' || state.phase === 'FIT_LOADED') {
     const fit = state.fitTrack
     el.innerHTML = `
@@ -44,7 +58,7 @@ function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
               <div class="dual-upload-line ${fit ? 'line-complete' : ''}"></div>
             </div>
             <div class="dual-upload-body">
-              <div class="dual-upload-title">Broken .fit file</div>
+              <div class="dual-upload-title">Broken activity</div>
               ${fit ? `
                 <div class="dual-upload-done">
                   <span class="dual-upload-done-icon">✓</span>
@@ -57,6 +71,8 @@ function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
                   <div class="upload-formats">Your recorded activity, gaps and all</div>
                   <input type="file" id="file-input-fit" accept=".fit" style="display:none" />
                 </div>
+                <div class="upload-or">or</div>
+                ${stravaConnectRow(state, 'activity', 'an activity')}
               `}
             </div>
           </div>
@@ -66,7 +82,7 @@ function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
               <div class="dual-upload-num">2</div>
             </div>
             <div class="dual-upload-body">
-              <div class="dual-upload-title">Reference .gpx route</div>
+              <div class="dual-upload-title">Reference route</div>
               ${fit ? `
                 <div class="upload-zone" id="upload-zone-gpx">
                   <div class="upload-icon">🗺️</div>
@@ -74,8 +90,10 @@ function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
                   <div class="upload-formats">A clean route covering the same path</div>
                   <input type="file" id="file-input-gpx" accept=".gpx" style="display:none" />
                 </div>
+                <div class="upload-or">or</div>
+                ${stravaConnectRow(state, 'route', 'a saved route')}
               ` : `
-                <div class="upload-hint-disabled">Upload the broken .fit file first</div>
+                <div class="upload-hint-disabled">Add the broken activity first</div>
               `}
             </div>
           </div>
@@ -84,6 +102,9 @@ function renderSidebar(el, onFitFile, onGpxFile, onAutoFix, state) {
     `
     _bindZone(el, 'upload-zone-fit', 'file-input-fit', onFitFile)
     _bindZone(el, 'upload-zone-gpx', 'file-input-gpx', onGpxFile)
+    el.querySelectorAll('[data-action="strava-login"]').forEach(btn => btn.addEventListener('click', onStravaLogin))
+    el.querySelector('[data-action="strava-pick"][data-slot="activity"]')?.addEventListener('click', onPickStravaActivity)
+    el.querySelector('[data-action="strava-pick"][data-slot="route"]')?.addEventListener('click', onPickStravaRoute)
     return
   }
 
