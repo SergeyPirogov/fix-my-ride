@@ -18,7 +18,10 @@ async function stravaFetch(path, accessToken) {
 export async function fetchActivities(accessToken, { page = 1, perPage = 30 } = {}) {
   const activities = await stravaFetch(`/athlete/activities?page=${page}&per_page=${perPage}`, accessToken)
   return activities.map(a => ({
-    id: a.id,
+    // Strava's numeric ids can exceed Number.MAX_SAFE_INTEGER — JSON.parse
+    // silently rounds those, producing a different (wrong) id. id_str is
+    // the same value as an exact string; always prefer it over id.
+    id: a.id_str ?? String(a.id),
     name: a.name,
     type: a.type,
     distanceM: a.distance,
@@ -30,7 +33,7 @@ export async function fetchActivities(accessToken, { page = 1, perPage = 30 } = 
 export async function fetchRoutes(accessToken, athleteId, { page = 1, perPage = 30 } = {}) {
   return stravaFetch(`/athletes/${athleteId}/routes?page=${page}&per_page=${perPage}`, accessToken)
     .then(routes => routes.map(r => ({
-      id: r.id,
+      id: r.id_str ?? String(r.id), // see note in fetchActivities — id_str avoids precision loss
       name: r.name,
       distanceM: r.distance,
       type: r.type, // 1 = ride, 2 = run
