@@ -3,11 +3,11 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-export function initSidebar({ onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute }) {
+export function initSidebar({ onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx }) {
   const el = document.getElementById('sidebar')
   el.className = 'sidebar'
 
-  const handlers = { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute }
+  const handlers = { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx }
   renderSidebar(el, handlers, store.state)
 
   if (_unsubscribe) _unsubscribe()
@@ -16,11 +16,14 @@ export function initSidebar({ onFitFile, onGpxFile, onAutoFix, onStravaLogin, on
   })
 }
 
-function trackSummary(track, label, colorClass) {
+function trackSummary(track, label, colorClass, changeBtnId) {
   const totalDist = track.points[track.points.length - 1]?.distance ?? 0
   return `
     <div class="track-summary">
-      <div class="track-summary-label ${colorClass}">${label}</div>
+      <div class="track-summary-header">
+        <div class="track-summary-label ${colorClass}">${label}</div>
+        ${changeBtnId ? `<button class="dual-upload-change" id="${changeBtnId}">Change</button>` : ''}
+      </div>
       <div class="track-meta">
         <div class="track-meta-row"><span class="track-meta-key">Distance</span><span class="track-meta-val">${(totalDist / 1000).toFixed(1)} km</span></div>
         <div class="track-meta-row"><span class="track-meta-key">Points</span><span class="track-meta-val">${track.points.length}</span></div>
@@ -41,7 +44,7 @@ function stravaConnectRow(state, slot, label) {
 }
 
 function renderSidebar(el, handlers, state) {
-  const { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute } = handlers
+  const { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx } = handlers
 
   if (state.phase === 'IDLE' || state.phase === 'FIT_LOADED') {
     const fit = state.fitTrack
@@ -63,6 +66,7 @@ function renderSidebar(el, handlers, state) {
                 <div class="dual-upload-done">
                   <span class="dual-upload-done-icon">✓</span>
                   ${fit.points.length.toLocaleString()} points · ${(((fit.points[fit.points.length-1]?.distance ?? 0))/1000).toFixed(1)} km
+                  <button class="dual-upload-change" id="btn-change-fit">Change</button>
                 </div>
               ` : `
                 <div class="upload-zone" id="upload-zone-fit">
@@ -105,13 +109,14 @@ function renderSidebar(el, handlers, state) {
     el.querySelectorAll('[data-action="strava-login"]').forEach(btn => btn.addEventListener('click', onStravaLogin))
     el.querySelector('[data-action="strava-pick"][data-slot="activity"]')?.addEventListener('click', onPickStravaActivity)
     el.querySelector('[data-action="strava-pick"][data-slot="route"]')?.addEventListener('click', onPickStravaRoute)
+    el.querySelector('#btn-change-fit')?.addEventListener('click', onChangeFit)
     return
   }
 
   if (state.phase === 'BOTH_LOADED' && state.fitTrack && state.gpxTrack) {
     el.innerHTML = `
-      <div class="sidebar-section border-b">${trackSummary(state.fitTrack, 'FIT (broken)', 'label-blue')}</div>
-      <div class="sidebar-section border-b">${trackSummary(state.gpxTrack, 'GPX (reference)', 'label-red')}</div>
+      <div class="sidebar-section border-b">${trackSummary(state.fitTrack, 'FIT (broken)', 'label-blue', 'btn-change-fit')}</div>
+      <div class="sidebar-section border-b">${trackSummary(state.gpxTrack, 'GPX (reference)', 'label-red', 'btn-change-gpx')}</div>
       <div class="sidebar-section">
         <div class="sidebar-label">Fix Route</div>
         <div class="gap-hint">
@@ -122,6 +127,8 @@ function renderSidebar(el, handlers, state) {
       </div>
     `
     el.querySelector('#btn-auto-fix')?.addEventListener('click', () => onAutoFix())
+    el.querySelector('#btn-change-fit')?.addEventListener('click', onChangeFit)
+    el.querySelector('#btn-change-gpx')?.addEventListener('click', onChangeGpx)
     return
   }
 
@@ -141,8 +148,8 @@ function renderSidebar(el, handlers, state) {
   if ((state.phase === 'FIXED' || state.phase === 'EXPORTED') && state.fitTrack) {
     const fixedDist = state.fixedPoints?.[state.fixedPoints.length - 1]?.distance ?? 0
     el.innerHTML = `
-      <div class="sidebar-section border-b">${trackSummary(state.fitTrack, 'FIT (broken)', 'label-blue')}</div>
-      <div class="sidebar-section border-b">${trackSummary(state.gpxTrack, 'GPX (reference)', 'label-red')}</div>
+      <div class="sidebar-section border-b">${trackSummary(state.fitTrack, 'FIT (broken)', 'label-blue', 'btn-change-fit')}</div>
+      <div class="sidebar-section border-b">${trackSummary(state.gpxTrack, 'GPX (reference)', 'label-red', 'btn-change-gpx')}</div>
       <div class="sidebar-section">
         <div class="sidebar-label">Fix Result</div>
         <div class="track-meta-row"><span class="track-meta-key">Fixed points</span><span class="track-meta-val val-ok">${state.fixedPoints?.length ?? 0}</span></div>
@@ -151,6 +158,8 @@ function renderSidebar(el, handlers, state) {
       </div>
     `
     el.querySelector('#btn-reselect')?.addEventListener('click', () => store.reset())
+    el.querySelector('#btn-change-fit')?.addEventListener('click', onChangeFit)
+    el.querySelector('#btn-change-gpx')?.addEventListener('click', onChangeGpx)
     return
   }
 

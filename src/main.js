@@ -7,12 +7,20 @@ import { initPanel, showToast } from './ui/panel.js'
 import { parseFit, detectGaps } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
-import { renderFitTrack, renderGpxTrack, renderFixedTrack, clearAll, showScrubMarker, clearScrubMarker } from './map/track-layer.js'
+import { renderFitTrack, renderGpxTrack, renderFixedTrack, clearAll, clearGpxTrack, showScrubMarker, clearScrubMarker } from './map/track-layer.js'
 import { buildFixedTrackFromGpx, writeFit, downloadFit } from './io/fit-writer.js'
 import { initAnalysisPanel } from './ui/analysis-panel.js'
 import { redirectToStravaLogin, handleAuthRedirect, refreshAuthIfNeeded, getStoredAuth } from './strava/auth.js'
 import { fetchActivities, fetchRoutes, fetchActivityStreams, fetchRouteStreams } from './strava/api.js'
 import { openStravaPicker, showStravaPickerLoading, closeStravaPicker } from './ui/strava-picker.js'
+
+// Changing just the fit (or gpx) slot after both were already set should
+// land back on BOTH_LOADED, not FIT_LOADED — otherwise the still-valid
+// other slot drops out of view until it's re-picked too.
+function setFitTrack(fitTrack) {
+  const phase = store.state.gpxTrack ? 'BOTH_LOADED' : 'FIT_LOADED'
+  store.setState({ phase, fitTrack, fixedPoints: null })
+}
 
 async function handleFitFile(file) {
   if (!file.name.toLowerCase().endsWith('.fit')) {
@@ -22,7 +30,7 @@ async function handleFitFile(file) {
   try {
     const buf = await file.arrayBuffer()
     const fitTrack = await parseFit(buf)
-    store.setState({ phase: 'FIT_LOADED', fitTrack })
+    setFitTrack(fitTrack)
   } catch (e) {
     showToast(e.message || 'Failed to parse .fit file')
   }
@@ -36,7 +44,7 @@ async function handleGpxFile(file) {
   try {
     const text = await file.text()
     const gpxTrack = parseGpx(text)
-    store.setState({ phase: 'BOTH_LOADED', gpxTrack })
+    store.setState({ phase: 'BOTH_LOADED', gpxTrack, fixedPoints: null })
   } catch (e) {
     showToast(e.message || 'Failed to parse .gpx file')
   }
@@ -53,6 +61,16 @@ async function doAutoFix() {
 
 function handleStravaLogin() {
   redirectToStravaLogin()
+}
+
+function changeFit() {
+  // Dropping the broken activity invalidates any fix already computed
+  // from it, but the reference route (if picked) is still valid — keep it.
+  store.setState({ phase: 'IDLE', fitTrack: null, fixedPoints: null })
+}
+
+function changeGpx() {
+  store.setState({ phase: 'FIT_LOADED', gpxTrack: null, fixedPoints: null })
 }
 
 async function pickStravaActivity() {
@@ -76,7 +94,7 @@ async function pickStravaActivity() {
           const points = await fetchActivityStreams(auth.access_token, activity.id)
           const gaps = detectGaps(points)
           const fitTrack = { activityType: activity.type.toLowerCase().includes('run') ? 'running' : 'cycling', points, gaps }
-          store.setState({ phase: 'FIT_LOADED', fitTrack })
+          setFitTrack(fitTrack)
         } catch (e) {
           showToast(e.message || 'Could not load that activity')
         }
@@ -108,7 +126,7 @@ async function pickStravaRoute() {
         try {
           const points = await fetchRouteStreams(auth.access_token, route.id)
           const gpxTrack = { activityType: route.type === 2 ? 'running' : 'cycling', points }
-          store.setState({ phase: 'BOTH_LOADED', gpxTrack })
+          store.setState({ phase: 'BOTH_LOADED', gpxTrack, fixedPoints: null })
         } catch (e) {
           showToast(e.message || 'Could not load that route')
         }
@@ -130,6 +148,8 @@ initSidebar({
   onStravaLogin: handleStravaLogin,
   onPickStravaActivity: pickStravaActivity,
   onPickStravaRoute: pickStravaRoute,
+  onChangeFit: changeFit,
+  onChangeGpx: changeGpx,
 })
 
 // Restore an existing session, or finish the OAuth redirect if we just came
@@ -201,5 +221,10 @@ store.subscribe(state => {
   if (state.gpxTrack && state.gpxTrack !== _lastGpx) {
     _lastGpx = state.gpxTrack
     renderGpxTrack(map, state.gpxTrack)
+  } else if (!state.gpxTrack && _lastGpx) {
+    // "Change" cleared the gpx slot while keeping fit — drop its layer
+    // instead of leaving a stale red line on the map.
+    _lastGpx = null
+    clearGpxTrack(map)
   }
 })
