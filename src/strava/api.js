@@ -50,12 +50,21 @@ export async function fetchActivityStreams(accessToken, activityId) {
 
 // Routes don't have recorded streams (they're planned, not ridden) but
 // expose the same latlng/altitude/distance shape via /route/{id}/streams.
+// Unlike the activity streams endpoint, key_by_type=true is silently
+// ignored here — Strava always returns the array form
+// ([{type:'latlng',data:[...]}, ...]) — so streamsToPoints normalizes it.
 export async function fetchRouteStreams(accessToken, routeId) {
   const data = await stravaFetch(`/routes/${routeId}/streams`, accessToken)
   return streamsToPoints(data, { noTimestamp: true })
 }
 
-function streamsToPoints(streams, { noTimestamp = false } = {}) {
+function keyStreamsByType(streams) {
+  if (!Array.isArray(streams)) return streams
+  return streams.reduce((acc, s) => ({ ...acc, [s.type]: s }), {})
+}
+
+function streamsToPoints(rawStreams, { noTimestamp = false } = {}) {
+  const streams = keyStreamsByType(rawStreams)
   const latlng = streams.latlng?.data ?? []
   const altitude = streams.altitude?.data ?? []
   const distance = streams.distance?.data ?? []
