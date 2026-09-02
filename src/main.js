@@ -190,9 +190,14 @@ async function pickStravaRoute() {
   }
 }
 
-trackVisitorCity()
-
 const map = initMap()
+
+// Center the map on the visitor's own location as a friendlier starting
+// point than the hardcoded default — only while nothing's been uploaded yet,
+// so it never yanks the view out from under a track the user is looking at.
+trackVisitorCity(coords => {
+  if (store.state.phase === 'IDLE') map.setView([coords.latitude, coords.longitude], 12)
+})
 
 initTopbar()
 const mobileTabs = initMobileTabs()

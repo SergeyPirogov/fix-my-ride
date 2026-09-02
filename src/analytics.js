@@ -14,11 +14,12 @@ export function trackEvent(name, data) {
 // grant the geolocation permission prompt — silently does nothing on
 // denial, timeout, or any network failure, since this is purely a "where
 // are our visitors coming from" signal and must never block the actual tool.
-export function trackVisitorCity() {
+export function trackVisitorCity(onLocation) {
   if (!navigator.geolocation) return
 
   navigator.geolocation.getCurrentPosition(
     async ({ coords }) => {
+      onLocation?.(coords)
       try {
         const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.latitude}&lon=${coords.longitude}`
         const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
