@@ -136,7 +136,14 @@ function bindScrub(root, points, series, onScrub, onScrubEnd) {
     if (readoutHr) readoutHr.textContent = fmtVal(series.hr[idx], 'bpm')
     if (readoutPower) readoutPower.textContent = fmtVal(series.power[idx], 'W')
 
-    onScrub?.({ lat: points[idx].lat, lng: points[idx].lng })
+    // Before a fix exists, a scrubbed point can land in a GPS dropout
+    // (null lat/lng, kept for its HR/power data) — skip the map marker then
+    // rather than passing it a null coordinate.
+    if (points[idx].lat != null && points[idx].lng != null) {
+      onScrub?.({ lat: points[idx].lat, lng: points[idx].lng })
+    } else {
+      onScrubEnd?.()
+    }
   }
 
   function hide() {

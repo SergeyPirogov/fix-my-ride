@@ -28,11 +28,17 @@ export function parseFit(arrayBuffer) {
       const sport = session?.sport ?? 'cycling'
       const activityType = SPORT_MAP[sport] ?? 'cycling'
       const records = data.activity?.sessions?.flatMap(s => s.laps?.flatMap(l => l.records ?? []) ?? []) ?? []
+      // Devices keep recording HR/power/cadence through a GPS dropout, so
+      // dropping every record without a position (as this used to do) threw
+      // away real sensor data for the exact stretch this app exists to fix —
+      // lat/lng just come through as null and downstream consumers (map
+      // rendering, the fix builder) already treat position as optional or
+      // don't need it at all.
       const points = records
-        .filter(r => r.position_lat != null && r.position_long != null)
+        .filter(r => r.distance != null)
         .map(r => ({
-          lat: r.position_lat,
-          lng: r.position_long,
+          lat: r.position_lat ?? null,
+          lng: r.position_long ?? null,
           ele: r.altitude ?? 0,
           timestamp: r.timestamp instanceof Date ? r.timestamp.getTime() : r.timestamp * 1000,
           hr: r.heart_rate ?? null,
@@ -41,6 +47,7 @@ export function parseFit(arrayBuffer) {
           distance: r.distance ?? 0,
         }))
       if (points.length === 0) return reject(new Error('No GPS data found in this file'))
+      if (!points.some(p => p.lat != null)) return reject(new Error('No GPS data found in this file'))
       const gaps = detectGaps(points)
       resolve({ activityType, points, gaps })
     })

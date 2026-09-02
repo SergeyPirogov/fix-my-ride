@@ -8,7 +8,11 @@ const FIX_LAYER_KEY = '__fixLayers'
 export function renderFitTrack(map, track) {
   clearFitTrack(map)
   if (!track || track.points.length === 0) return
-  const latlngs = track.points.map(p => [p.lat, p.lng])
+  // Records through a GPS dropout carry null lat/lng (kept for their HR/power
+  // data — see fit-parser.js) — skip them here so the polyline doesn't jump
+  // through [null, null].
+  const latlngs = track.points.filter(p => p.lat != null && p.lng != null).map(p => [p.lat, p.lng])
+  if (latlngs.length === 0) return
   map[FIT_LAYER_KEY] = L.polyline(latlngs, { color: '#2563EB', weight: 4, opacity: 0.9 }).addTo(map)
   fitBoundsToVisible(map)
 }
