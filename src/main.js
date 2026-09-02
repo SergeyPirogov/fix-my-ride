@@ -14,7 +14,7 @@ import { redirectToStravaLogin, handleAuthRedirect, refreshAuthIfNeeded, getStor
 import { fetchActivities, fetchRoutes, fetchActivityStreams, fetchRouteStreams, uploadActivity } from './strava/api.js'
 import { openStravaPicker, showStravaPickerLoading, closeStravaPicker } from './ui/strava-picker.js'
 import { initMobileTabs } from './ui/mobile-tabs.js'
-import { trackEvent } from './analytics.js'
+import { trackEvent, trackVisitorCity } from './analytics.js'
 
 // Changing just the fit (or gpx) slot after both were already set should
 // land back on BOTH_LOADED, not FIT_LOADED — otherwise the still-valid
@@ -189,6 +189,8 @@ async function pickStravaRoute() {
     showToast(e.message || 'Could not load your Strava routes')
   }
 }
+
+trackVisitorCity()
 
 const map = initMap()
 
