@@ -25,6 +25,33 @@ function profileFor(activityType) {
   return activityType === 'running' ? 'foot' : 'cycling'
 }
 
+const ELEVATION_BATCH_SIZE = 400 // stay well under Open-Elevation's request-size limit
+
+// OSRM's routing response has no elevation, so a drawn route would otherwise
+// come out perfectly flat. Open-Elevation (free, keyless) fills it in from
+// real terrain data — batched and chunked so a long, densely-snapped route
+// doesn't send one oversized request. Best-effort: on any failure the route
+// just keeps its flat placeholder elevation rather than blocking the fix.
+async function fetchElevations(points) {
+  const elevations = new Array(points.length).fill(0)
+  for (let i = 0; i < points.length; i += ELEVATION_BATCH_SIZE) {
+    const chunk = points.slice(i, i + ELEVATION_BATCH_SIZE)
+    try {
+      const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locations: chunk.map(([lat, lng]) => ({ latitude: lat, longitude: lng })) }),
+      })
+      if (!res.ok) continue
+      const data = await res.json()
+      data.results?.forEach((r, j) => { elevations[i + j] = r.elevation ?? 0 })
+    } catch {
+      // Ignore — the chunk just stays flat.
+    }
+  }
+  return elevations
+}
+
 export function startDrawingRoute(map, { activityType = 'cycling', onError } = {}) {
   const profile = profileFor(activityType)
   const waypoints = [] // [{lat, lng}] — the clicked points, before road-snapping
@@ -62,7 +89,7 @@ export function startDrawingRoute(map, { activityType = 'cycling', onError } = {
   return {
     // Builds a gpxTrack-shaped object: no recorded time/HR/power exist for a
     // drawn route, so those fields stay null — same as a picked Strava route.
-    finish() {
+    async finish() {
       map.off('click', clickHandler)
       map.removeLayer(map[DRAW_LAYER_KEY])
       map.removeLayer(map[WAYPOINT_LAYER_KEY])
@@ -72,13 +99,15 @@ export function startDrawingRoute(map, { activityType = 'cycling', onError } = {
       const flat = segments.flat()
       if (flat.length < 2) return null
 
+      const elevations = await fetchElevations(flat)
+
       let cumulativeDistance = 0
       const points = flat.map(([lat, lng], i) => {
         if (i > 0) {
           const [prevLat, prevLng] = flat[i - 1]
           cumulativeDistance += map.distance([prevLat, prevLng], [lat, lng])
         }
-        return { lat, lng, ele: 0, timestamp: Date.now() + i * 1000, hr: null, power: null, cadence: null, distance: Math.round(cumulativeDistance) }
+        return { lat, lng, ele: elevations[i], timestamp: Date.now() + i * 1000, hr: null, power: null, cadence: null, distance: Math.round(cumulativeDistance) }
       })
       return { activityType, points }
     },

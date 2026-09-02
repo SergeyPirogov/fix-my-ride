@@ -157,8 +157,11 @@ function startDrawRoute() {
     _drawSession = null
     endDrawMode()
   })
-  bar.querySelector('#btn-draw-finish').addEventListener('click', () => {
-    const gpxTrack = _drawSession?.finish()
+  bar.querySelector('#btn-draw-finish').addEventListener('click', async () => {
+    const finishBtn = bar.querySelector('#btn-draw-finish')
+    finishBtn.disabled = true
+    finishBtn.textContent = 'Fetching elevation…'
+    const gpxTrack = await _drawSession?.finish()
     _drawSession = null
     endDrawMode()
     if (!gpxTrack) { showToast('Click at least two points on the map to draw a route'); return }
