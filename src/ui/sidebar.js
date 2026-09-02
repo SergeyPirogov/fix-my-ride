@@ -51,6 +51,7 @@ function renderSidebar(el, handlers, state) {
     el.innerHTML = `
       <div class="upload-page">
         <div class="upload-hero-icon">📍</div>
+        ${state.visitorCity ? `<div class="visitor-city">📍 ${state.visitorCity}</div>` : ''}
         <div class="upload-page-title">Fix broken GPS<br>with a reference route</div>
         <div class="upload-page-sub">Upload your broken activity, then a clean route to fix it against</div>
 

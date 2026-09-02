@@ -38,7 +38,6 @@ export function initTopbar() {
         }).join('')}
       </div>
       <div class="topbar-actions">
-        ${state.visitorCity ? `<div class="visitor-city">📍 ${state.visitorCity}</div>` : ''}
         <button class="theme-toggle" id="theme-toggle">◐</button>
       </div>
     `
