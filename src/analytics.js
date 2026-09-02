@@ -14,7 +14,7 @@ export function trackEvent(name, data) {
 // grant the geolocation permission prompt — silently does nothing on
 // denial, timeout, or any network failure, since this is purely a "where
 // are our visitors coming from" signal and must never block the actual tool.
-export function trackVisitorCity(onLocation) {
+export function trackVisitorCity(onLocation, onCity) {
   if (!navigator.geolocation) return
 
   navigator.geolocation.getCurrentPosition(
@@ -26,7 +26,10 @@ export function trackVisitorCity(onLocation) {
         if (!res.ok) return
         const data = await res.json()
         const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county
-        if (city) trackEvent('visitor-city', { city, country: data.address?.country })
+        if (city) {
+          trackEvent('visitor-city', { city, country: data.address?.country })
+          onCity?.(city)
+        }
       } catch {
         // Ignore — city tracking is not essential.
       }
