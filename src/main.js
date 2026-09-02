@@ -341,7 +341,16 @@ store.subscribe(state => {
 
   if (state.fitTrack && state.fitTrack !== _lastFit) {
     _lastFit = state.fitTrack
-    renderFitTrack(map, state.fitTrack)
+    // Same as the FIXED-phase refit below: the analysis panel now opens as
+    // soon as a fit track loads, and its CSS-transitioned height change
+    // needs a second invalidateSize() once that transition settles so the
+    // map doesn't stay centered on the pre-transition container size.
+    const refit = () => {
+      map.invalidateSize()
+      renderFitTrack(map, state.fitTrack)
+    }
+    refit()
+    setTimeout(refit, 350)
   }
   if (state.gpxTrack && state.gpxTrack !== _lastGpx) {
     _lastGpx = state.gpxTrack

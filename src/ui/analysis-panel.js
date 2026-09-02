@@ -68,13 +68,11 @@ export function initAnalysisPanel({ onScrub, onScrubEnd } = {}) {
 
   if (_unsubscribe) _unsubscribe()
   _unsubscribe = store.subscribe(state => {
-    if (state.phase !== 'FIXED' && state.phase !== 'EXPORTED') {
-      el.className = ''
-      el.innerHTML = ''
-      return
-    }
-
-    const points = state.fixedPoints ?? []
+    const showsFixedTrack = state.phase === 'FIXED' || state.phase === 'EXPORTED'
+    // Before a fix exists, show the broken track's own recorded data so the
+    // user can see what they're working with (gaps and all) — same charts,
+    // just sourced from fitTrack instead of the corrected fixedPoints.
+    const points = showsFixedTrack ? (state.fixedPoints ?? []) : (state.fitTrack?.points ?? [])
     if (points.length < 2) { el.className = ''; el.innerHTML = ''; return }
 
     el.className = 'analysis-panel-open'
