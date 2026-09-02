@@ -5,8 +5,8 @@ export function initMap() {
   const map = L.map('map', {
     zoomControl: false,
     attributionControl: true,
-    center: [48.2, 16.37],
-    zoom: 13,
+    center: [50.45, 30.52],
+    zoom: 11,
   })
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
