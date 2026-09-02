@@ -73,8 +73,8 @@ export function trackVisitorCity(onLocation, onCity) {
   navigator.geolocation.getCurrentPosition(
     onSuccess,
     () => {
-      navigator.geolocation.getCurrentPosition(onSuccess, onFailure, { enableHighAccuracy: false, timeout: 8000 })
+      navigator.geolocation.getCurrentPosition(onSuccess, onFailure, { enableHighAccuracy: false, timeout: 3000 })
     },
-    { enableHighAccuracy: false, timeout: 8000 }
+    { enableHighAccuracy: false, timeout: 3000 }
   )
 }
