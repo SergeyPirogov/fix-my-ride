@@ -8,6 +8,7 @@ import { parseFit, detectGaps } from './io/fit-parser.js'
 import { parseGpx } from './io/gpx-parser.js'
 import { initMap } from './map/map.js'
 import { renderFitTrack, renderGpxTrack, renderFixedTrack, clearAll, clearGpxTrack, showScrubMarker, clearScrubMarker } from './map/track-layer.js'
+import { startDrawingRoute } from './map/draw-route.js'
 import { buildFixedTrackFromGpx, writeFit, downloadFit } from './io/fit-writer.js'
 import { initAnalysisPanel } from './ui/analysis-panel.js'
 import { redirectToStravaLogin, handleAuthRedirect, refreshAuthIfNeeded, getStoredAuth, hasUploadScope } from './strava/auth.js'
@@ -125,6 +126,46 @@ function changeGpx() {
   store.setState({ phase: 'FIT_LOADED', gpxTrack: null, fixedPoints: null })
 }
 
+let _drawSession = null
+
+function startDrawRoute() {
+  if (_drawSession) return
+  mobileTabs?.activate('map-column')
+
+  const bar = document.createElement('div')
+  bar.className = 'draw-route-bar'
+  bar.innerHTML = `
+    <span class="draw-route-hint">Click the map to add waypoints — routes snap to roads</span>
+    <button class="btn btn-ghost" id="btn-draw-cancel">Cancel</button>
+    <button class="btn btn-primary" id="btn-draw-finish">Finish route</button>
+  `
+  document.getElementById('map-column').appendChild(bar)
+  map.invalidateSize()
+
+  _drawSession = startDrawingRoute(map, {
+    activityType: store.state.fitTrack?.activityType ?? 'cycling',
+    onError: msg => showToast(msg),
+  })
+
+  function endDrawMode() {
+    bar.remove()
+    map.invalidateSize()
+  }
+
+  bar.querySelector('#btn-draw-cancel').addEventListener('click', () => {
+    _drawSession?.cancel()
+    _drawSession = null
+    endDrawMode()
+  })
+  bar.querySelector('#btn-draw-finish').addEventListener('click', () => {
+    const gpxTrack = _drawSession?.finish()
+    _drawSession = null
+    endDrawMode()
+    if (!gpxTrack) { showToast('Click at least two points on the map to draw a route'); return }
+    store.setState({ phase: 'BOTH_LOADED', gpxTrack, fixedPoints: null })
+  })
+}
+
 async function pickStravaActivity() {
   const auth = await refreshAuthIfNeeded()
   if (!auth) { showToast('Strava session expired — please connect again'); return }
@@ -214,6 +255,7 @@ initSidebar({
   onPickStravaRoute: pickStravaRoute,
   onChangeFit: changeFit,
   onChangeGpx: changeGpx,
+  onDrawRoute: startDrawRoute,
 })
 
 // Restore an existing session, or finish the OAuth redirect if we just came

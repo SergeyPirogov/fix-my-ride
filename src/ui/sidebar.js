@@ -3,11 +3,11 @@ import { store } from '../store.js'
 
 let _unsubscribe = null
 
-export function initSidebar({ onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx }) {
+export function initSidebar({ onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx, onDrawRoute }) {
   const el = document.getElementById('sidebar')
   el.classList.add('sidebar')
 
-  const handlers = { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx }
+  const handlers = { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx, onDrawRoute }
   renderSidebar(el, handlers, store.state)
 
   if (_unsubscribe) _unsubscribe()
@@ -44,7 +44,7 @@ function stravaConnectRow(state, slot, label) {
 }
 
 function renderSidebar(el, handlers, state) {
-  const { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx } = handlers
+  const { onFitFile, onGpxFile, onAutoFix, onStravaLogin, onPickStravaActivity, onPickStravaRoute, onChangeFit, onChangeGpx, onDrawRoute } = handlers
 
   if (state.phase === 'IDLE' || state.phase === 'FIT_LOADED') {
     const fit = state.fitTrack
@@ -100,6 +100,8 @@ function renderSidebar(el, handlers, state) {
                 </div>
                 <div class="upload-or">or</div>
                 ${stravaConnectRow(state, 'route', 'a saved route')}
+                <div class="upload-or">or</div>
+                <button class="strava-connect-btn" id="btn-draw-route">🖊️ Draw a route on the map</button>
               ` : `
                 <div class="upload-hint-disabled">Add the broken activity first</div>
               `}
@@ -113,6 +115,7 @@ function renderSidebar(el, handlers, state) {
     el.querySelectorAll('[data-action="strava-login"]').forEach(btn => btn.addEventListener('click', onStravaLogin))
     el.querySelector('[data-action="strava-pick"][data-slot="activity"]')?.addEventListener('click', onPickStravaActivity)
     el.querySelector('[data-action="strava-pick"][data-slot="route"]')?.addEventListener('click', onPickStravaRoute)
+    el.querySelector('#btn-draw-route')?.addEventListener('click', onDrawRoute)
     el.querySelector('#btn-change-fit')?.addEventListener('click', onChangeFit)
     el.querySelector('#btn-discard')?.addEventListener('click', () => store.reset())
     return
