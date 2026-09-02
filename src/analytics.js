@@ -14,27 +14,40 @@ export function trackEvent(name, data) {
 // grant the geolocation permission prompt — silently does nothing on
 // denial, timeout, or any network failure, since this is purely a "where
 // are our visitors coming from" signal and must never block the actual tool.
+async function reverseGeocodeCity(coords, onCity) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.latitude}&lon=${coords.longitude}`
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+    if (!res.ok) return
+    const data = await res.json()
+    const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county
+    if (city) {
+      trackEvent('visitor-city', { city, country: data.address?.country })
+      onCity?.(city)
+    }
+  } catch {
+    // Ignore — city tracking is not essential.
+  }
+}
+
 export function trackVisitorCity(onLocation, onCity) {
   if (!navigator.geolocation) return
 
+  const onSuccess = ({ coords }) => {
+    onLocation?.(coords)
+    reverseGeocodeCity(coords, onCity)
+  }
+
+  // Desktop browsers resolve position via Wi-Fi/IP lookup rather than real
+  // GPS, and that backend (macOS CoreLocation in particular) frequently
+  // fails the first attempt with a transient "location unknown" error —
+  // enableHighAccuracy:false favors that faster, more reliable network
+  // lookup over GPS, and a single silent retry papers over the flakiness.
   navigator.geolocation.getCurrentPosition(
-    async ({ coords }) => {
-      onLocation?.(coords)
-      try {
-        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.latitude}&lon=${coords.longitude}`
-        const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
-        if (!res.ok) return
-        const data = await res.json()
-        const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county
-        if (city) {
-          trackEvent('visitor-city', { city, country: data.address?.country })
-          onCity?.(city)
-        }
-      } catch {
-        // Ignore — city tracking is not essential.
-      }
+    onSuccess,
+    () => {
+      navigator.geolocation.getCurrentPosition(onSuccess, () => {}, { enableHighAccuracy: false, timeout: 8000 })
     },
-    () => {}, // permission denied or unavailable — no-op
-    { timeout: 5000 }
+    { enableHighAccuracy: false, timeout: 8000 }
   )
 }
