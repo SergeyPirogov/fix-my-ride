@@ -30,23 +30,50 @@ async function reverseGeocodeCity(coords, onCity) {
   }
 }
 
+// Falls back to IP-based geolocation (ipapi.co, free, keyless, city-level)
+// when the browser's own geolocation is unavailable, denied, or fails —
+// which happens often on desktop, where OS location backends (macOS
+// CoreLocation in particular) frequently error out with no real fix on
+// our end. Less precise than GPS, but doesn't need a permission prompt.
+async function fallbackToIpLocation(onLocation, onCity) {
+  try {
+    const res = await fetch('https://ipapi.co/json/')
+    if (!res.ok) return
+    const data = await res.json()
+    if (data.latitude != null && data.longitude != null) {
+      onLocation?.({ latitude: data.latitude, longitude: data.longitude })
+    }
+    if (data.city) {
+      trackEvent('visitor-city', { city: data.city, country: data.country_name, source: 'ip' })
+      onCity?.(data.city)
+    }
+  } catch {
+    // Ignore — city tracking is not essential.
+  }
+}
+
 export function trackVisitorCity(onLocation, onCity) {
-  if (!navigator.geolocation) return
+  if (!navigator.geolocation) {
+    fallbackToIpLocation(onLocation, onCity)
+    return
+  }
 
   const onSuccess = ({ coords }) => {
     onLocation?.(coords)
     reverseGeocodeCity(coords, onCity)
   }
+  const onFailure = () => fallbackToIpLocation(onLocation, onCity)
 
   // Desktop browsers resolve position via Wi-Fi/IP lookup rather than real
   // GPS, and that backend (macOS CoreLocation in particular) frequently
   // fails the first attempt with a transient "location unknown" error —
   // enableHighAccuracy:false favors that faster, more reliable network
-  // lookup over GPS, and a single silent retry papers over the flakiness.
+  // lookup over GPS, and a single retry papers over the flakiness before
+  // giving up and falling back to IP-based location entirely.
   navigator.geolocation.getCurrentPosition(
     onSuccess,
     () => {
-      navigator.geolocation.getCurrentPosition(onSuccess, () => {}, { enableHighAccuracy: false, timeout: 8000 })
+      navigator.geolocation.getCurrentPosition(onSuccess, onFailure, { enableHighAccuracy: false, timeout: 8000 })
     },
     { enableHighAccuracy: false, timeout: 8000 }
   )
