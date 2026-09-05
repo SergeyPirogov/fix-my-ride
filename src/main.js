@@ -94,11 +94,15 @@ async function uploadFixedFitToStrava(btn) {
   if (!fitTrack || !fixedPoints) { showToast('No fixed track to upload — click Fix using GPX first'); return }
 
   let auth = await refreshAuthIfNeeded()
-  if (!auth) { showToast('Strava session expired — please connect again'); return }
-
-  if (!hasUploadScope(auth)) {
+  // Whether the token's outright expired (refresh failed) or it's just
+  // missing the upload scope, the fix is the same: relogin and resume —
+  // stashing state first since the redirect leaves and comes back to a
+  // fresh page load, which would otherwise drop the in-memory fix. There's
+  // no "Connect Strava" button reachable from this screen to do it
+  // manually, so this is the only path back to a working upload.
+  if (!auth || !hasUploadScope(auth)) {
     stashStateForRelogin()
-    showToast('Reconnecting to Strava to allow uploads…', 'success')
+    showToast('Reconnecting to Strava…', 'success')
     redirectToStravaLogin()
     return
   }
